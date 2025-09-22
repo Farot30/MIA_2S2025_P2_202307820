@@ -1,0 +1,45 @@
+digraph MBR {
+  node [shape=plaintext];
+  rankdir=LR;
+  MBR [label=<
+    <table border='1' cellborder='1' cellspacing='0'>
+      <tr><td colspan='2' bgcolor='purple'><font color='white'><b>REPORTE DE MBR</b></font></td></tr>
+      <tr><td>mbr_tamaño</td><td>5242880</td></tr>
+      <tr><td bgcolor='#E6E6FA'>mbr_fecha_creacion</td><td bgcolor='#E6E6FA'>2025-08-31 20:05:18</td></tr>
+      <tr><td>mbr_disk_signature</td><td>770615692</td></tr>
+      <tr><td colspan='2' bgcolor='#4B0082'><font color='white'><b>Particion</b></font></td></tr>
+      <tr><td>part_status</td><td>2 (Montada)</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_type</td><td bgcolor='#E6E6FA'>P</td></tr>
+      <tr><td>part_fit</td><td>W</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_start</td><td bgcolor='#E6E6FA'>176</td></tr>
+      <tr><td>part_size</td><td>2097152</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_name</td><td bgcolor='#E6E6FA'>Part1</td></tr>
+      <tr><td colspan='2' bgcolor='#4B0082'><font color='white'><b>Particion</b></font></td></tr>
+      <tr><td>part_status</td><td>1 (Montada)</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_type</td><td bgcolor='#E6E6FA'>P</td></tr>
+      <tr><td>part_fit</td><td>W</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_start</td><td bgcolor='#E6E6FA'>2097328</td></tr>
+      <tr><td>part_size</td><td>1048576</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_name</td><td bgcolor='#E6E6FA'>Part2</td></tr>
+      <tr><td colspan='2' bgcolor='#4B0082'><font color='white'><b>Particion</b></font></td></tr>
+      <tr><td>part_status</td><td>0 (No montada)</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_type</td><td bgcolor='#E6E6FA'>E</td></tr>
+      <tr><td>part_fit</td><td>W</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_start</td><td bgcolor='#E6E6FA'>3145904</td></tr>
+      <tr><td>part_size</td><td>1048576</td></tr>
+      <tr><td bgcolor='#E6E6FA'>part_name</td><td bgcolor='#E6E6FA'>Part3</td></tr>
+    </table>
+  >];
+  EBR1 [label=<
+    <table border='1' cellborder='1' cellspacing='0'>
+      <tr><td colspan='2' bgcolor='#FF9980'><font color='black'><b>Particion Logica</b></font></td></tr>
+      <tr><td>part_status</td><td>1 (Montada)</td></tr>
+      <tr><td bgcolor='#FFD6CC'>part_next</td><td bgcolor='#FFD6CC'>-1</td></tr>
+      <tr><td>part_fit</td><td>W</td></tr>
+      <tr><td bgcolor='#FFD6CC'>part_start</td><td bgcolor='#FFD6CC'>3145936</td></tr>
+      <tr><td>part_size</td><td>512000</td></tr>
+      <tr><td bgcolor='#FFD6CC'>part_name</td><td bgcolor='#FFD6CC'>Part4</td></tr>
+    </table>
+  >];
+  MBR -> EBR1;
+}

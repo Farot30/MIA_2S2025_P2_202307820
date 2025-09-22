@@ -1,0 +1,59 @@
+# Script de ejemplo para crear y montar un disco
+# Creado: 22/08/2025
+
+# Crear un disco de 5MB
+mkdisk -size=5 -path=disco1.smia
+
+# Formatear el disco
+fdisk -size=3 -path=disco1.smia -name=Part1 -unit=M
+
+# Montar la partición
+mount -path=disco1.smia -name=Part1
+
+mkfs -id=201A -type=full
+
+login -user=root -pass=123 -id=201A
+
+mkdir -path=/dir1 -p
+
+mkfile -path=/dir1/archivo1.txt -cont=/home/farot/Descargas/nes.txt
+
+rep -id=201A -path=/home/farot/Calificacion_MIA/Reportes/p4_r6_file.txt" -path_file_ls=/dir1/archivo1.txt  -name=file
+
+
+
+
+rmdisk -path=Disco1.mia
+rmdisk -path=Disco2.mia
+# Crear discos
+mkdisk -size=5 -unit=m -path=Disco1.mia
+mkdisk -size=10 -unit=m -path=Disco2.mia
+
+# Crear particiones
+fdisk -size=2 -unit=m -path=Disco1.mia -name=Part1 -type=P
+fdisk -size=1 -unit=m -path=Disco1.mia -name=Part2 -type=P
+fdisk -size=1 -unit=m -path=Disco1.mia -name=Part3 -type=E
+fdisk -size=500 -unit=k -path=Disco1.mia -name=Part4 -type=L
+
+# Montar particiones
+mount -path=Disco1.mia -name=Part1
+mount -path=Disco1.mia -name=Part2
+mount -path=Disco1.mia -name=Part4
+
+# Formatear una partición
+mkfs -id=201A -type=full
+
+# Crear usuario y login
+login -user=root -pass=123 -id=201A
+mkgrp -name=grupo1
+mkusr -user=user1 -pass=456 -grp=grupo1
+
+# Crear directorios y archivos
+mkdir -path=/dir1 -p
+mkdir -path=/dir1/dir2
+mkfile -path=/dir1/archivo1.txt -size=100
+
+rep -name=mbr -path=/home/farot/Documentos/Archivos/proyectos/MIA_2S2025_P1_202307820/reportes/reporte_mbr.pdf -id=201A
+
+# Reporte DISK básico
+rep -name=disk -path=/home/farot/Documentos/Archivos/proyectos/MIA_2S2025_P1_202307820/reportes/reporte_disk.jpg -id=201A
