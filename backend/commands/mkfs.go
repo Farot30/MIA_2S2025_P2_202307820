@@ -1,11 +1,11 @@
-package commands
+package commandsP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/structures"
-	"MIA_2S2025_P1_202307820/utilities"
+	bloques "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	structuresP2 "MIA_2S2025_P2_202307820/structures"
+	utilities "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"strconv"
@@ -189,13 +189,13 @@ func MKFS(args []string) {
 
 	if mountedPartition.Type == "Primaria" {
 		// Buscar en particiones primarias del MBR
-		var mbr structures.MBR
+		var mbr structuresP2.MBR
 		if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
 			fmt.Printf("Error leyendo el MBR: %s\n", err)
 			return
 		}
 
-		var partition *structures.Partition
+		var partition *structuresP2.Partition
 		var partitionIndex int = -1
 		for i, p := range mbr.MbrPartitions {
 			if p.PartS > 0 {
@@ -275,13 +275,13 @@ func MKFS(args []string) {
 // findLogicalPartitionInfo busca información de una partición lógica
 func findLogicalPartitionInfo(file *os.File, partitionName string) (int32, int32, error) {
 	// Leer MBR para encontrar la partición extendida
-	var mbr structures.MBR
+	var mbr structuresP2.MBR
 	if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
 		return 0, 0, fmt.Errorf("error leyendo el MBR: %s", err)
 	}
 
 	// Encontrar la partición extendida
-	var extendedPartition *structures.Partition
+	var extendedPartition *structuresP2.Partition
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartType == 'E' && mbr.MbrPartitions[i].PartS > 0 {
 			extendedPartition = &mbr.MbrPartitions[i]
@@ -299,7 +299,7 @@ func findLogicalPartitionInfo(file *os.File, partitionName string) (int32, int32
 
 	currentEBRPos := extendedStart
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		ebr, err := structures.ReadEBR(file, currentEBRPos)
+		ebr, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			break
 		}
@@ -321,13 +321,13 @@ func findLogicalPartitionInfo(file *os.File, partitionName string) (int32, int32
 // updateLogicalPartitionFormat actualiza el status de formato de una partición lógica
 func updateLogicalPartitionFormat(file *os.File, partitionName string) error {
 	// Leer MBR para encontrar la partición extendida
-	var mbr structures.MBR
+	var mbr structuresP2.MBR
 	if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
 		return fmt.Errorf("error leyendo el MBR: %s", err)
 	}
 
 	// Encontrar la partición extendida
-	var extendedPartition *structures.Partition
+	var extendedPartition *structuresP2.Partition
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartType == 'E' && mbr.MbrPartitions[i].PartS > 0 {
 			extendedPartition = &mbr.MbrPartitions[i]
@@ -345,7 +345,7 @@ func updateLogicalPartitionFormat(file *os.File, partitionName string) error {
 
 	currentEBRPos := extendedStart
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		ebr, err := structures.ReadEBR(file, currentEBRPos)
+		ebr, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			break
 		}
@@ -359,7 +359,7 @@ func updateLogicalPartitionFormat(file *os.File, partitionName string) error {
 			ebr.PartMount = 2 // 2 = formateada
 
 			// Escribir el EBR actualizado al disco
-			err = structures.WriteEBR(file, ebr, currentEBRPos)
+			err = structuresP2.WriteEBR(file, ebr, currentEBRPos)
 			if err != nil {
 				return fmt.Errorf("error escribiendo EBR actualizado: %s", err)
 			}

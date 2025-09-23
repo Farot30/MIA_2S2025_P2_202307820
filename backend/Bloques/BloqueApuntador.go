@@ -1,4 +1,4 @@
-package bloques
+package BloquesP2
 
 import (
 	"bytes"

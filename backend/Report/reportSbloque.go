@@ -1,8 +1,8 @@
-package report
+package reportP2
 
 import (
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
+	EstructuraExt2P2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	estructuraArchivoCarpetaP2 "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,13 +16,13 @@ import (
 
 // outputPath: ruta de salida (ej: /home/user/reports/report8.jpg)
 func GenerateSuperblockReport(diskPath string, partitionStart int32, outputPath string) error {
-	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(diskPath, partitionStart)
+	ext2fs, err := EstructuraExt2P2.ReadEXT2FileSystem(diskPath, partitionStart)
 	if err != nil {
 		return fmt.Errorf("leer EXT2: %v", err)
 	}
 
 	// validar magic (opcional)
-	if ext2fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+	if ext2fs.SuperBlock.S_magic != estructuraArchivoCarpetaP2.EXT2_MAGIC {
 		// seguir pero avisar
 		// return fmt.Errorf("no es EXT2 válido (magic mismatch)")
 	}

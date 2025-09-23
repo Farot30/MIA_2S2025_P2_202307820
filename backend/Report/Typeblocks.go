@@ -1,8 +1,8 @@
-package report
+package reportP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
+	BloquesP2 "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2P2 "MIA_2S2025_P2_202307820/EstructuraExt2"
 	"fmt"
 	"os"
 )
@@ -18,7 +18,7 @@ const (
 
 // Recursivamente marca los bloques referenciados por apuntadores
 // Ahora recibe "level": 1 = indirecto simple, 2 = doble, 3 = triple
-func markBlocksRecursively(ext2fs *EstructuraExt2.EXT2FileSystem, blockTypes map[int32]BlockType, blockNum int32, level int, origTipo BlockType, depth int) {
+func markBlocksRecursively(ext2fs *EstructuraExt2P2.EXT2FileSystem, blockTypes map[int32]BlockType, blockNum int32, level int, origTipo BlockType, depth int) {
 	// helper: validar rango de bloque
 	isValidBlock := func(n int32) bool {
 		return n >= ext2fs.SuperBlock.S_first_blo && n < ext2fs.SuperBlock.S_blocks_count
@@ -55,7 +55,7 @@ func markBlocksRecursively(ext2fs *EstructuraExt2.EXT2FileSystem, blockTypes map
 		if _, err := file.Read(block); err != nil {
 			return
 		}
-		bloqueApuntador := &bloques.BloqueApuntador{}
+		bloqueApuntador := &BloquesP2.BloqueApuntador{}
 		// Use FromBytes to parse consistentemente
 		if err := bloqueApuntador.FromBytes(block[:bloqueApuntador.GetSize()]); err == nil {
 			// Contar punteros válidos antes de propagar (evita interpretar texto como punteros)
@@ -104,7 +104,7 @@ func markBlocksRecursively(ext2fs *EstructuraExt2.EXT2FileSystem, blockTypes map
 }
 
 // Mapea todos los bloques usados y su tipo, incluyendo los referenciados por apuntadores
-func MapBlockTypes(ext2fs *EstructuraExt2.EXT2FileSystem) map[int32]BlockType {
+func MapBlockTypes(ext2fs *EstructuraExt2P2.EXT2FileSystem) map[int32]BlockType {
 	blockTypes := make(map[int32]BlockType)
 	for i := int32(0); i < ext2fs.SuperBlock.S_blocks_count; i++ {
 		blockTypes[i] = BlockUnknown

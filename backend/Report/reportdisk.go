@@ -1,8 +1,8 @@
-package report
+package reportP2
 
 import (
-	"MIA_2S2025_P1_202307820/structures"
-	"MIA_2S2025_P1_202307820/utilities"
+	structuresP2 "MIA_2S2025_P2_202307820/structures"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"os/exec"
@@ -31,8 +31,8 @@ func GenerateDiskReport(diskPath string, partitionStart int32, outputPath string
 	defer file.Close()
 
 	// Leer el MBR del disco
-	var mbr structures.MBR
-	if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
+	var mbr structuresP2.MBR
+	if err := utilitiesP2.ReadStruct(file, 0, &mbr); err != nil {
 		return fmt.Errorf("error leyendo MBR: %s", err)
 	}
 
@@ -106,14 +106,14 @@ func GenerateDiskReport(diskPath string, partitionStart int32, outputPath string
 }
 
 // calculateNumColumns calcula el número de columnas necesarias para la tabla del disco
-func calculateNumColumns(mbr structures.MBR) int {
+func calculateNumColumns(mbr structuresP2.MBR) int {
 	// Como es solo para calcular el número de columnas, podemos usar una ruta vacía
 	// o mejor aún, modificar la función para que sea más simple
 	sections := identifyDiskSectionsForCount(mbr)
 	return len(sections)
 }
 
-func identifyDiskSectionsForCount(mbr structures.MBR) []DiskSection {
+func identifyDiskSectionsForCount(mbr structuresP2.MBR) []DiskSection {
 	var sections []DiskSection
 
 	// Añadir MBR
@@ -142,7 +142,7 @@ func identifyDiskSectionsForCount(mbr structures.MBR) []DiskSection {
 }
 
 // identifyDiskSections identifica todas las secciones del disco (MBR, particiones y espacios libres)
-func identifyDiskSections(mbr structures.MBR, disktPath string) []DiskSection {
+func identifyDiskSections(mbr structuresP2.MBR, disktPath string) []DiskSection {
 	var sections []DiskSection
 
 	// Añadir el MBR
@@ -156,7 +156,7 @@ func identifyDiskSections(mbr structures.MBR, disktPath string) []DiskSection {
 	sections = append(sections, mbrSection)
 
 	// Recopilar todas las particiones válidas
-	var partitions []structures.Partition
+	var partitions []structuresP2.Partition
 	for _, p := range mbr.MbrPartitions {
 		if p.PartS > 0 {
 			partitions = append(partitions, p)
@@ -247,7 +247,7 @@ func identifyDiskSections(mbr structures.MBR, disktPath string) []DiskSection {
 	return sections
 }
 
-func identifyLogicalSections(diskPath string, extendedPartition structures.Partition, diskSize int32) []DiskSection {
+func identifyLogicalSections(diskPath string, extendedPartition structuresP2.Partition, diskSize int32) []DiskSection {
 	var sections []DiskSection
 
 	// Abrir el archivo del disco
@@ -264,7 +264,7 @@ func identifyLogicalSections(diskPath string, extendedPartition structures.Parti
 	lastEnd := extendedStart
 
 	// Leer el primer EBR
-	ebr := structures.NewEBR()
+	ebr := structuresP2.NewEBR()
 	_, err = file.Seek(int64(currentPos), 0)
 	if err != nil {
 		return sections
@@ -388,7 +388,7 @@ func identifyLogicalSections(diskPath string, extendedPartition structures.Parti
 }
 
 // generateDiskSectionsHTML genera el HTML para las secciones del disco
-func generateDiskSectionsHTML(dot *strings.Builder, sections []DiskSection, mbr structures.MBR, diskPath string) {
+func generateDiskSectionsHTML(dot *strings.Builder, sections []DiskSection, mbr structuresP2.MBR, diskPath string) {
 	// Primera fila: las secciones con sus nombres
 	dot.WriteString("      <tr>")
 	for _, section := range sections {
@@ -400,7 +400,7 @@ func generateDiskSectionsHTML(dot *strings.Builder, sections []DiskSection, mbr 
 		// Si es una partición extendida, mostrarla con su contenido
 		if section.Type == "Extendida" {
 			// Encontrar la partición extendida original
-			var extendedPartition structures.Partition
+			var extendedPartition structuresP2.Partition
 			for _, p := range mbr.MbrPartitions {
 				if p.PartType == 'E' && p.PartStart == section.Start {
 					extendedPartition = p
@@ -486,7 +486,7 @@ func generateDiskSectionsHTML(dot *strings.Builder, sections []DiskSection, mbr 
 }
 
 // addDiskLegend añade una leyenda con información adicional del disco
-func addDiskLegend(dot *strings.Builder, mbr structures.MBR, diskPath string) {
+func addDiskLegend(dot *strings.Builder, mbr structuresP2.MBR, diskPath string) {
 	dot.WriteString("  legend [label=<\n")
 	dot.WriteString("    <table border='0' cellborder='1' cellspacing='0' cellpadding='4'>\n")
 	dot.WriteString("      <tr><td colspan='2' bgcolor='#336699'><font color='white'><b>Información del Disco</b></font></td></tr>\n")

@@ -1,9 +1,9 @@
-package commands
+package commandsP2
 
 import (
-	reportdisk "MIA_2S2025_P1_202307820/Report"
-	"MIA_2S2025_P1_202307820/structures"
-	"MIA_2S2025_P1_202307820/utilities"
+	reportdisk "MIA_2S2025_P2_202307820/Report"
+	structuresP2 "MIA_2S2025_P2_202307820/structures"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,11 +15,11 @@ import (
 
 func REP(args []string) {
 	// Parsear parámetros
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	// Validar parámetros requeridos
 	required := []string{"name", "path", "id"}
-	if err := utilities.ValidateRequiredParams(params, required); err != nil {
+	if err := utilitiesP2.ValidateRequiredParams(params, required); err != nil {
 		fmt.Printf("Error: %s\n", err)
 		fmt.Println("Uso: rep -name=<tipo_reporte> -path=<ruta_destino> -id=<partition_id> [-path_file_ls=<ruta>]")
 		return
@@ -168,8 +168,8 @@ func GenerateMBRReport(partition MountedPartition, outputPath string) error {
 	defer file.Close()
 
 	// Leer el MBR del disco
-	var mbr structures.MBR
-	if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
+	var mbr structuresP2.MBR
+	if err := utilitiesP2.ReadStruct(file, 0, &mbr); err != nil {
 		return fmt.Errorf("error leyendo MBR: %s", err)
 	}
 
@@ -260,7 +260,7 @@ func GenerateEBRsReport(dot *strings.Builder, file *os.File, startPos int32, end
 
 	for currentEBRPos != -1 && currentEBRPos < endPos {
 		// Leer el EBR
-		ebr := structures.NewEBR()
+		ebr := structuresP2.NewEBR()
 		if _, err := file.Seek(int64(currentEBRPos), 0); err != nil {
 			break
 		}

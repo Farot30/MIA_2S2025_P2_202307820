@@ -1,7 +1,7 @@
-package session
+package sessionP2
 
 import (
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
+	EstructuraarchivocarpetaP2 "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	"fmt"
 )
 
@@ -56,7 +56,7 @@ func GetUserCategory(fileOwnerUID, fileOwnerGID int32) UserCategory {
 }
 
 // CheckPermissions verifica si el usuario actual tiene permisos para una operación específica
-func CheckPermissions(inode *estructuraArchivoCarpeta.Inodo, operation PermissionType) (bool, error) {
+func CheckPermissions(inode *EstructuraarchivocarpetaP2.Inodo, operation PermissionType) (bool, error) {
 	// USUARIO ROOT SIEMPRE TIENE TODOS LOS PERMISOS (777)
 	if IsRootUser() {
 		fmt.Printf("Usuario ROOT detectado - Permisos COMPLETOS (777) otorgados\n")
@@ -116,7 +116,7 @@ func CheckPermissions(inode *estructuraArchivoCarpeta.Inodo, operation Permissio
 }
 
 // RequirePermissions verifica permisos y devuelve error si no los tiene
-func RequirePermissions(inode *estructuraArchivoCarpeta.Inodo, operation PermissionType) error {
+func RequirePermissions(inode *EstructuraarchivocarpetaP2.Inodo, operation PermissionType) error {
 	hasPermission, err := CheckPermissions(inode, operation)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func RequirePermissions(inode *estructuraArchivoCarpeta.Inodo, operation Permiss
 }
 
 // CheckMultiplePermissions verifica múltiples permisos a la vez
-func CheckMultiplePermissions(inode *estructuraArchivoCarpeta.Inodo, operations ...PermissionType) (bool, error) {
+func CheckMultiplePermissions(inode *EstructuraarchivocarpetaP2.Inodo, operations ...PermissionType) (bool, error) {
 	for _, operation := range operations {
 		hasPermission, err := CheckPermissions(inode, operation)
 		if err != nil {
@@ -181,25 +181,25 @@ func GetPermissionsString(permissions [3]byte) string {
 }
 
 // CanRead verifica permisos de lectura
-func CanRead(inode *estructuraArchivoCarpeta.Inodo) bool {
+func CanRead(inode *EstructuraarchivocarpetaP2.Inodo) bool {
 	can, _ := CheckPermissions(inode, READ)
 	return can
 }
 
 // CanWrite verifica permisos de escritura
-func CanWrite(inode *estructuraArchivoCarpeta.Inodo) bool {
+func CanWrite(inode *EstructuraarchivocarpetaP2.Inodo) bool {
 	can, _ := CheckPermissions(inode, WRITE)
 	return can
 }
 
 // CanExecute verifica permisos de ejecución
-func CanExecute(inode *estructuraArchivoCarpeta.Inodo) bool {
+func CanExecute(inode *EstructuraarchivocarpetaP2.Inodo) bool {
 	can, _ := CheckPermissions(inode, EXECUTE)
 	return can
 }
 
 // ShowPermissionsInfo muestra información detallada de permisos
-func ShowPermissionsInfo(inode *estructuraArchivoCarpeta.Inodo) {
+func ShowPermissionsInfo(inode *EstructuraarchivocarpetaP2.Inodo) {
 	session := GetCurrentSession()
 	if session == nil {
 		fmt.Println("No hay sesión activa")
@@ -251,16 +251,16 @@ func RequireRootUser() error {
 }
 
 // RequireReadAccess verifica permisos de lectura
-func RequireReadAccess(inode *estructuraArchivoCarpeta.Inodo) error {
+func RequireReadAccess(inode *EstructuraarchivocarpetaP2.Inodo) error {
 	return RequirePermissions(inode, READ)
 }
 
 // RequireWriteAccess verifica permisos de escritura
-func RequireWriteAccess(inode *estructuraArchivoCarpeta.Inodo) error {
+func RequireWriteAccess(inode *EstructuraarchivocarpetaP2.Inodo) error {
 	return RequirePermissions(inode, WRITE)
 }
 
 // RequireExecuteAccess verifica permisos de ejecución
-func RequireExecuteAccess(inode *estructuraArchivoCarpeta.Inodo) error {
+func RequireExecuteAccess(inode *EstructuraarchivocarpetaP2.Inodo) error {
 	return RequirePermissions(inode, EXECUTE)
 }

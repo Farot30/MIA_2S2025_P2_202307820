@@ -1,11 +1,11 @@
-package commands
+package commandsP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	session "MIA_2S2025_P1_202307820/Session"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/utilities"
+	bloques "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	session "MIA_2S2025_P2_202307820/Session"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	utilities "MIA_2S2025_P2_202307820/utilities"
 	"bufio"
 	"fmt"
 	"io/ioutil"

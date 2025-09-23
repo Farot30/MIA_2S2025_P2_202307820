@@ -1,12 +1,12 @@
-package commands
+package commandsP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	session "MIA_2S2025_P1_202307820/Session"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/structures"
-	"MIA_2S2025_P1_202307820/utilities"
+	bloques "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	session "MIA_2S2025_P2_202307820/Session"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	structuresP2 "MIA_2S2025_P2_202307820/structures"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"strings"
@@ -15,11 +15,11 @@ import (
 // LOGIN implementa el comando para iniciar sesión en el sistema
 func LOGIN(args []string) {
 	// Parsear parámetros usando utilities
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	// Validar parámetros requeridos
 	required := []string{"user", "pass", "id"}
-	if err := utilities.ValidateRequiredParams(params, required); err != nil {
+	if err := utilitiesP2.ValidateRequiredParams(params, required); err != nil {
 		fmt.Printf("Error: %s\n", err)
 		fmt.Println("Uso: login -user=<usuario> -pass=<contraseña> -id=<partition_id>")
 		return
@@ -180,7 +180,7 @@ func readUsersFile(partition MountedPartition) (string, error) {
 	// Leer el inodo del archivo users.txt
 	usersInode := &estructuraArchivoCarpeta.Inodo{}
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (usersInodeNum * ext2fs.SuperBlock.S_inode_s))
-	err = utilities.ReadStruct(file, inodeOffset, usersInode)
+	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
 	if err != nil {
 		return "", fmt.Errorf("error leyendo inodo de users.txt: %s", err)
 	}
@@ -205,8 +205,8 @@ func getPartitionStartOffset(partition MountedPartition) int32 {
 
 	if partition.Type == "Primaria" {
 		// Leer MBR para encontrar la partición primaria
-		var mbr structures.MBR
-		if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
+		var mbr structuresP2.MBR
+		if err := utilitiesP2.ReadStruct(file, 0, &mbr); err != nil {
 			return 0
 		}
 
@@ -236,7 +236,7 @@ func findFileInRootDirectory(file *os.File, ext2fs *EstructuraExt2.EXT2FileSyste
 	rootBlock := &bloques.BloqueCarpeta{}
 	rootBlockOffset := int64(ext2fs.SuperBlock.S_block_start)
 
-	err := utilities.ReadStruct(file, rootBlockOffset, rootBlock)
+	err := utilitiesP2.ReadStruct(file, rootBlockOffset, rootBlock)
 	if err != nil {
 		return -1, fmt.Errorf("error leyendo bloque del directorio raíz: %s", err)
 	}
@@ -270,7 +270,7 @@ func readFileContentFromBlocks(file *os.File, ext2fs *EstructuraExt2.EXT2FileSys
 		fileBlock := &bloques.BloqueArchivo{}
 		blockOffset := int64(ext2fs.SuperBlock.S_block_start + (blockNum * ext2fs.SuperBlock.S_block_s))
 
-		err := utilities.ReadStruct(file, blockOffset, fileBlock)
+		err := utilitiesP2.ReadStruct(file, blockOffset, fileBlock)
 		if err != nil {
 			return "", fmt.Errorf("error leyendo bloque %d: %s", blockNum, err)
 		}

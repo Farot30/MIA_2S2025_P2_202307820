@@ -1,7 +1,7 @@
-package report
+package reportP2
 
 import (
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
+	EstructuraExt2P2 "MIA_2S2025_P2_202307820/EstructuraExt2"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,7 +9,7 @@ import (
 )
 
 func GenerateFileReport(diskPath string, partitionStart int32, mountID string, filePath string, outputPath string) error {
-	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(diskPath, partitionStart)
+	ext2fs, err := EstructuraExt2P2.ReadEXT2FileSystem(diskPath, partitionStart)
 	if err != nil {
 		return fmt.Errorf("leer EXT2: %v", err)
 	}

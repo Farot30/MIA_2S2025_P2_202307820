@@ -1,8 +1,8 @@
 package main
 
 import (
-	"MIA_2S2025_P1_202307820/commands"
-	"MIA_2S2025_P1_202307820/utilities"
+	commandsP2 "MIA_2S2025_P2_202307820/commands"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -77,9 +77,9 @@ func executeCommands(commandText string) string {
 	for _, line := range lines {
 		trim := strings.TrimSpace(line)
 		if strings.HasPrefix(strings.ToLower(trim), "rep ") {
-			parts := utilities.ParseCommand(trim)
+			parts := utilitiesP2.ParseCommand(trim)
 			if len(parts) > 1 {
-				params := utilities.ParseParameters(parts[1:])
+				params := utilitiesP2.ParseParameters(parts[1:])
 				for key, value := range params {
 					if strings.ToLower(key) == "path" {
 						dir := filepath.Dir(value)
@@ -195,14 +195,14 @@ func executeCommands(commandText string) string {
 
 func executeCommand(input string) {
 	// Parsear el comando
-	cmdParts := utilities.ParseCommand(input)
+	cmdParts := utilitiesP2.ParseCommand(input)
 	if len(cmdParts) == 0 {
 		fmt.Println("Error: Comando vacío o no reconocido")
 		return
 	}
 
 	// Parsear parámetros en mapa para validar
-	params := utilities.ParseParameters(cmdParts[1:])
+	params := utilitiesP2.ParseParameters(cmdParts[1:])
 
 	// Definir parámetros permitidos por comando
 	allowedParams := map[string][]string{
@@ -227,7 +227,7 @@ func executeCommand(input string) {
 
 	cmdName := strings.ToLower(cmdParts[0])
 	if allowed, ok := allowedParams[cmdName]; ok {
-		if err := utilities.ValidateAllowedParams(params, allowed); err != nil {
+		if err := utilitiesP2.ValidateAllowedParams(params, allowed); err != nil {
 			// Mostrar error y no ejecutar el comando
 			fmt.Printf("Error en parámetros: %v\n", err)
 			return
@@ -241,39 +241,39 @@ func executeCommand(input string) {
 	// Ejecutar comando
 	switch strings.ToLower(cmdParts[0]) {
 	case "mkdisk":
-		commands.MKDISK(cmdParts[1:])
+		commandsP2.MKDISK(cmdParts[1:])
 	case "rmdisk":
-		commands.RMDISK(cmdParts[1:])
+		commandsP2.RMDISK(cmdParts[1:])
 	case "fdisk":
-		commands.FDISK(cmdParts[1:])
+		commandsP2.FDISK(cmdParts[1:])
 	case "mount":
-		commands.MOUNT(cmdParts[1:])
+		commandsP2.MOUNT(cmdParts[1:])
 	case "mounted":
-		commands.MOUNTED(cmdParts[1:])
+		commandsP2.MOUNTED(cmdParts[1:])
 	case "mkfs":
-		commands.MKFS(cmdParts[1:])
+		commandsP2.MKFS(cmdParts[1:])
 	case "login":
-		commands.LOGIN(cmdParts[1:])
+		commandsP2.LOGIN(cmdParts[1:])
 	case "logout":
-		commands.LOGOUT(cmdParts[1:])
+		commandsP2.LOGOUT(cmdParts[1:])
 	case "cat":
-		commands.CAT(cmdParts[1:])
+		commandsP2.CAT(cmdParts[1:])
 	case "mkgrp":
-		commands.MKGRP(cmdParts[1:])
+		commandsP2.MKGRP(cmdParts[1:])
 	case "rmgrp":
-		commands.RMGRP(cmdParts[1:])
+		commandsP2.RMGRP(cmdParts[1:])
 	case "mkusr":
-		commands.MKUSR(cmdParts[1:])
+		commandsP2.MKUSR(cmdParts[1:])
 	case "rmusr":
-		commands.RMUSR(cmdParts[1:])
+		commandsP2.RMUSR(cmdParts[1:])
 	case "chgrp":
-		commands.CHGRP(cmdParts[1:])
+		commandsP2.CHGRP(cmdParts[1:])
 	case "mkdir":
-		commands.MKDIR(cmdParts[1:])
+		commandsP2.MKDIR(cmdParts[1:])
 	case "mkfile":
-		commands.MKFILE(cmdParts[1:])
+		commandsP2.MKFILE(cmdParts[1:])
 	case "rep":
-		commands.REP(cmdParts[1:])
+		commandsP2.REP(cmdParts[1:])
 	default:
 		fmt.Printf("Error: Comando '%s' no reconocido\n", cmdParts[0])
 	}
@@ -525,9 +525,9 @@ func extractReportPath(commandText string) string {
 		// Buscar comandos REP
 		if strings.HasPrefix(strings.ToLower(trim), "rep ") {
 			// Parsear parámetros del comando REP
-			parts := utilities.ParseCommand(trim)
+			parts := utilitiesP2.ParseCommand(trim)
 			if len(parts) > 1 {
-				params := utilities.ParseParameters(parts[1:])
+				params := utilitiesP2.ParseParameters(parts[1:])
 
 				// Buscar parámetro path (case insensitive)
 				for key, value := range params {

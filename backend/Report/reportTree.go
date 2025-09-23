@@ -1,9 +1,9 @@
-package report
+package reportP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
+	bloques "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	"fmt"
 	"os"
 	"os/exec"

@@ -1,9 +1,9 @@
-package estructuraext2
+package EstructuraExt2P2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/utilities"
+	BloquesP2 "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraarchivocarpetaP2 "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"io"
 	"math"
@@ -14,7 +14,7 @@ import (
 
 // EXT2FileSystem representa el sistema de archivos EXT2
 type EXT2FileSystem struct {
-	SuperBlock    *estructuraArchivoCarpeta.SuperBloque
+	SuperBlock    *EstructuraarchivocarpetaP2.SuperBloque
 	PartitionPath string
 	PartitionSize int32
 	StartOffset   int32 // Offset donde inicia la partición en el disco
@@ -22,8 +22,8 @@ type EXT2FileSystem struct {
 
 // EXT2Constants contiene las constantes para el cálculo del sistema EXT2
 const (
-	SUPERBLOCK_SIZE = int32(unsafe.Sizeof(estructuraArchivoCarpeta.SuperBloque{}))
-	INODE_SIZE      = int32(unsafe.Sizeof(estructuraArchivoCarpeta.Inodo{}))
+	SUPERBLOCK_SIZE = int32(unsafe.Sizeof(EstructuraarchivocarpetaP2.SuperBloque{}))
+	INODE_SIZE      = int32(unsafe.Sizeof(EstructuraarchivocarpetaP2.Inodo{}))
 	BLOCK_SIZE      = 64 // Tamaño de cada bloque (carpeta, archivo, apuntador)
 	BITMAP_BYTE     = 1  // 1 byte para 8 bits del bitmap
 )
@@ -53,11 +53,11 @@ func CreateEXT2FileSystem(partitionPath string, partitionSize int32, startOffset
 	// Calcular el número de inodos y bloques
 	inodesCount, blocksCount := CalculateEXT2Structures(partitionSize)
 
-	currentTime := estructuraArchivoCarpeta.GetCurrentTimestamp() // Obtener el timestamp actual
+	currentTime := EstructuraarchivocarpetaP2.GetCurrentTimestamp() // Obtener el timestamp actual
 
 	// Crear el superbloque
-	superBlock := &estructuraArchivoCarpeta.SuperBloque{
-		S_filesystem_type:   estructuraArchivoCarpeta.EXT2_FILESYSTEM_TYPE,
+	superBlock := &EstructuraarchivocarpetaP2.SuperBloque{
+		S_filesystem_type:   EstructuraarchivocarpetaP2.EXT2_FILESYSTEM_TYPE,
 		S_inodes_count:      inodesCount,
 		S_blocks_count:      blocksCount,
 		S_free_blocks_count: blocksCount - 1, // -1 por el bloque raíz
@@ -65,7 +65,7 @@ func CreateEXT2FileSystem(partitionPath string, partitionSize int32, startOffset
 		S_mtime:             currentTime,
 		S_umtime:            currentTime,
 		S_mnt_count:         0,
-		S_magic:             estructuraArchivoCarpeta.EXT2_MAGIC,
+		S_magic:             EstructuraarchivocarpetaP2.EXT2_MAGIC,
 		S_inode_s:           INODE_SIZE,
 		S_block_s:           BLOCK_SIZE,
 		S_firts_ino:         2, // El primer inodo libre (1 es el raíz)
@@ -209,7 +209,7 @@ func (fs *EXT2FileSystem) FormatPartition() error {
 		return err
 	}
 
-	err = utilities.WriteStruct(file, int64(fs.StartOffset), fs.SuperBlock)
+	err = utilitiesP2.WriteStruct(file, int64(fs.StartOffset), fs.SuperBlock)
 	if err != nil {
 		return err
 	}
@@ -252,14 +252,14 @@ func (fs *EXT2FileSystem) FormatPartition() error {
 
 	// 4. Crear el inodo raíz usando la función auxiliar
 	rootInode := fs.InitializeRootInode()
-	err = utilities.WriteStruct(file, int64(fs.SuperBlock.S_inode_start), rootInode)
+	err = utilitiesP2.WriteStruct(file, int64(fs.SuperBlock.S_inode_start), rootInode)
 	if err != nil {
 		return err
 	}
 
 	// 5. Crear el bloque raíz usando la función auxiliar
 	rootBlock := fs.InitializeRootDirectoryBlock()
-	err = utilities.WriteStruct(file, int64(fs.SuperBlock.S_block_start), rootBlock)
+	err = utilitiesP2.WriteStruct(file, int64(fs.SuperBlock.S_block_start), rootBlock)
 	if err != nil {
 		return err
 	}
@@ -268,15 +268,15 @@ func (fs *EXT2FileSystem) FormatPartition() error {
 }
 
 // / InitializeRootInode inicializa el inodo raíz con valores por defecto
-func (fs *EXT2FileSystem) InitializeRootInode() *estructuraArchivoCarpeta.Inodo {
-	rootInode := &estructuraArchivoCarpeta.Inodo{}
+func (fs *EXT2FileSystem) InitializeRootInode() *EstructuraarchivocarpetaP2.Inodo {
+	rootInode := &EstructuraarchivocarpetaP2.Inodo{}
 	rootInode.SetRootValues()
 	return rootInode
 }
 
 // InitializeRootDirectoryBlock inicializa el bloque del directorio raíz
-func (fs *EXT2FileSystem) InitializeRootDirectoryBlock() *bloques.BloqueCarpeta {
-	rootBlock := &bloques.BloqueCarpeta{}
+func (fs *EXT2FileSystem) InitializeRootDirectoryBlock() *BloquesP2.BloqueCarpeta {
+	rootBlock := &BloquesP2.BloqueCarpeta{}
 
 	// Entrada para "." (directorio actual)
 	copy(rootBlock.B_content[0].B_name[:], ".")
@@ -303,14 +303,14 @@ func ReadEXT2FileSystem(partitionPath string, startOffset int32) (*EXT2FileSyste
 	defer file.Close()
 
 	// Leer el superbloque
-	superBlock := &estructuraArchivoCarpeta.SuperBloque{}
-	err = utilities.ReadStruct(file, int64(startOffset), superBlock)
+	superBlock := &EstructuraarchivocarpetaP2.SuperBloque{}
+	err = utilitiesP2.ReadStruct(file, int64(startOffset), superBlock)
 	if err != nil {
 		return nil, err
 	}
 
 	// Verificar la magia del sistema de archivos
-	if superBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+	if superBlock.S_magic != EstructuraarchivocarpetaP2.EXT2_MAGIC {
 		return nil, err
 	}
 
@@ -385,19 +385,19 @@ func (fs *EXT2FileSystem) GetEXT2Info() map[string]interface{} {
 // UpdateFreeSpace actualiza los contadores de espacio libre
 func (fs *EXT2FileSystem) UpdateFreeSpace(file *os.File) error {
 	// Escribir el superbloque actualizado
-	return utilities.WriteStruct(file, int64(fs.StartOffset), fs.SuperBlock)
+	return utilitiesP2.WriteStruct(file, int64(fs.StartOffset), fs.SuperBlock)
 }
 
-func (fs *EXT2FileSystem) ReadInode(index int32) (*estructuraArchivoCarpeta.Inodo, error) {
+func (fs *EXT2FileSystem) ReadInode(index int32) (*EstructuraarchivocarpetaP2.Inodo, error) {
 	file, err := os.OpenFile(fs.PartitionPath, os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	inode := &estructuraArchivoCarpeta.Inodo{}
+	inode := &EstructuraarchivocarpetaP2.Inodo{}
 	offset := int64(fs.SuperBlock.S_inode_start) + int64(index)*int64(INODE_SIZE)
-	err = utilities.ReadStruct(file, offset, inode)
+	err = utilitiesP2.ReadStruct(file, offset, inode)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +462,7 @@ func (fs *EXT2FileSystem) ReadFile(filePath string) (string, error) {
 			if err != nil {
 				continue
 			}
-			var bc bloques.BloqueCarpeta
+			var bc BloquesP2.BloqueCarpeta
 			if int32(len(buf)) >= bc.GetSize() {
 				copy((*[64]byte)(unsafe.Pointer(&bc))[:], buf[:bc.GetSize()])
 			} else {
@@ -482,7 +482,7 @@ func (fs *EXT2FileSystem) ReadFile(filePath string) (string, error) {
 			ptrBlock := in.Iblock[12]
 			buf, err := readBlock(ptrBlock)
 			if err == nil {
-				var bap bloques.BloqueApuntador
+				var bap BloquesP2.BloqueApuntador
 				if int32(len(buf)) >= bap.GetSize() {
 					copy((*[64]byte)(unsafe.Pointer(&bap))[:], buf[:bap.GetSize()])
 				} else {
@@ -496,7 +496,7 @@ func (fs *EXT2FileSystem) ReadFile(filePath string) (string, error) {
 					if err != nil {
 						continue
 					}
-					var bc bloques.BloqueCarpeta
+					var bc BloquesP2.BloqueCarpeta
 					if int32(len(bbuf)) >= bc.GetSize() {
 						copy((*[64]byte)(unsafe.Pointer(&bc))[:], bbuf[:bc.GetSize()])
 					} else {
@@ -549,7 +549,7 @@ func (fs *EXT2FileSystem) ReadFile(filePath string) (string, error) {
 	if targetInode.Iblock[12] >= 0 {
 		buf, err := readBlock(targetInode.Iblock[12])
 		if err == nil {
-			var bap bloques.BloqueApuntador
+			var bap BloquesP2.BloqueApuntador
 			if int32(len(buf)) >= bap.GetSize() {
 				copy((*[64]byte)(unsafe.Pointer(&bap))[:], buf[:bap.GetSize()])
 			} else {

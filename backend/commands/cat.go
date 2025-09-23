@@ -1,10 +1,10 @@
-package commands
+package commandsP2
 
 import (
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	session "MIA_2S2025_P1_202307820/Session"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/utilities"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	session "MIA_2S2025_P2_202307820/Session"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"strings"
@@ -20,7 +20,7 @@ func CAT(args []string) {
 	}
 
 	// Parsear parámetros usando utilities
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	// Buscar archivos (file1, file2, file3, etc.)
 	var files []string
@@ -118,7 +118,7 @@ func readFileFromEXT2(partition MountedPartition, filePath string) (string, erro
 	// Leer el inodo del archivo
 	fileInode := &estructuraArchivoCarpeta.Inodo{}
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (fileInodeNum * ext2fs.SuperBlock.S_inode_s))
-	err = utilities.ReadStruct(file, inodeOffset, fileInode)
+	err = utilitiesP2.ReadStruct(file, inodeOffset, fileInode)
 	if err != nil {
 		return "", fmt.Errorf("error leyendo inodo del archivo: %s", err)
 	}
@@ -168,7 +168,7 @@ func findFileByPath(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, filePa
 		if i < len(pathComponents)-1 {
 			foundInode := &estructuraArchivoCarpeta.Inodo{}
 			inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (foundInodeNum * ext2fs.SuperBlock.S_inode_s))
-			err = utilities.ReadStruct(file, inodeOffset, foundInode)
+			err = utilitiesP2.ReadStruct(file, inodeOffset, foundInode)
 			if err != nil {
 				return -1, fmt.Errorf("error leyendo inodo: %s", err)
 			}
@@ -250,7 +250,7 @@ func checkFileReadPermission(partition MountedPartition, filePath string, userUI
 	// Leer el inodo del archivo para obtener permisos
 	fileInode := &estructuraArchivoCarpeta.Inodo{}
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (fileInodeNum * ext2fs.SuperBlock.S_inode_s))
-	err = utilities.ReadStruct(file, inodeOffset, fileInode)
+	err = utilitiesP2.ReadStruct(file, inodeOffset, fileInode)
 	if err != nil {
 		return false, fmt.Errorf("error leyendo inodo del archivo: %s", err)
 	}

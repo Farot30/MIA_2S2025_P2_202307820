@@ -1,8 +1,8 @@
-package report
+package reportP2
 
 import (
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
+	estructuraext2P2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraarchivocarpetaP2 "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	"fmt"
 	"os"
 	"strings"
@@ -16,12 +16,12 @@ func GenerarBMIBlocReporte(diskPath string, partitionStart int32, outputPath str
 	}
 	defer file.Close()
 
-	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(diskPath, partitionStart)
+	ext2fs, err := estructuraext2P2.ReadEXT2FileSystem(diskPath, partitionStart)
 	if err != nil {
 		return fmt.Errorf("Error leyendo el sistema de archivos EXT2: %s", err)
 	}
 
-	if ext2fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+	if ext2fs.SuperBlock.S_magic != EstructuraarchivocarpetaP2.EXT2_MAGIC {
 		return fmt.Errorf("el sistema de archivos no es EXT2 válido (magic number incorrecto)")
 	}
 

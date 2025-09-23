@@ -1,11 +1,11 @@
-package commands
+package commandsP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	session "MIA_2S2025_P1_202307820/Session"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/utilities"
+	bloques "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	session "MIA_2S2025_P2_202307820/Session"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"strconv"
@@ -32,7 +32,7 @@ func MKUSR(args []string) {
 	}
 
 	// 4. Parsear parámetros
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	// Validar parámetros obligatorios
 	username, userExists := params["user"]
@@ -140,7 +140,7 @@ func createUser(partition MountedPartition, username, password, groupName string
 	// Leer el inodo del archivo users.txt
 	usersInode := &estructuraArchivoCarpeta.Inodo{}
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (usersInodeNum * ext2fs.SuperBlock.S_inode_s))
-	err = utilities.ReadStruct(file, inodeOffset, usersInode)
+	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
 	if err != nil {
 		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
 	}
@@ -314,7 +314,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 			indirectBlockNum := inode.GetIblock()[12]
 			apuntador = bloques.NewBloqueApuntador()
 			blockOffset := int64(ext2fs.SuperBlock.S_block_start + (indirectBlockNum * ext2fs.SuperBlock.S_block_s))
-			err := utilities.ReadStruct(file, blockOffset, apuntador)
+			err := utilitiesP2.ReadStruct(file, blockOffset, apuntador)
 			if err != nil {
 				return fmt.Errorf("error leyendo bloque de apuntadores existente: %s", err)
 			}
@@ -350,7 +350,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 
 		// Escribir el bloque de apuntadores actualizado
 		blockOffset := int64(ext2fs.SuperBlock.S_block_start + (inode.GetIblock()[12] * ext2fs.SuperBlock.S_block_s))
-		err := utilities.WriteStruct(file, blockOffset, apuntador)
+		err := utilitiesP2.WriteStruct(file, blockOffset, apuntador)
 		if err != nil {
 			return fmt.Errorf("error escribiendo bloque de apuntadores: %s", err)
 		}
@@ -364,7 +364,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 		if inode.GetIblock()[13] != -1 {
 			dobleBlockNum := inode.GetIblock()[13]
 			dobleOffset := int64(ext2fs.SuperBlock.S_block_start + (dobleBlockNum * ext2fs.SuperBlock.S_block_s))
-			utilities.ReadStruct(file, dobleOffset, dobleApuntador)
+			utilitiesP2.ReadStruct(file, dobleOffset, dobleApuntador)
 		} else {
 			dobleBlockNum, err := findFreeBlock(file, ext2fs)
 			if err != nil {
@@ -403,7 +403,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 				hijoNum = dobleApuntador.B_pointers[hijoIndex]
 				hijo = bloques.NewBloqueApuntador()
 				hijoOffsetDisk := int64(ext2fs.SuperBlock.S_block_start + (hijoNum * ext2fs.SuperBlock.S_block_s))
-				utilities.ReadStruct(file, hijoOffsetDisk, hijo)
+				utilitiesP2.ReadStruct(file, hijoOffsetDisk, hijo)
 			}
 
 			// Asignar bloque de datos si no existe
@@ -422,13 +422,13 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 
 			// Escribir el bloque hijo
 			hijoOffsetDisk := int64(ext2fs.SuperBlock.S_block_start + (hijoNum * ext2fs.SuperBlock.S_block_s))
-			utilities.WriteStruct(file, hijoOffsetDisk, hijo)
+			utilitiesP2.WriteStruct(file, hijoOffsetDisk, hijo)
 		}
 
 		// Escribir el bloque doble principal
 		dobleBlockNum := inode.GetIblock()[13]
 		dobleOffset := int64(ext2fs.SuperBlock.S_block_start + (dobleBlockNum * ext2fs.SuperBlock.S_block_s))
-		err := utilities.WriteStruct(file, dobleOffset, dobleApuntador)
+		err := utilitiesP2.WriteStruct(file, dobleOffset, dobleApuntador)
 		if err != nil {
 			return fmt.Errorf("error escribiendo bloque de apuntadores doble: %s", err)
 		}
@@ -452,7 +452,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 					hijo := bloques.NewBloqueApuntador()
 					hijoNum := dobleApuntador.B_pointers[hijoIndex]
 					hijoOffsetDisk := int64(ext2fs.SuperBlock.S_block_start + (hijoNum * ext2fs.SuperBlock.S_block_s))
-					utilities.ReadStruct(file, hijoOffsetDisk, hijo)
+					utilitiesP2.ReadStruct(file, hijoOffsetDisk, hijo)
 					return hijo.B_pointers[hijoOffset]
 				}
 			}
@@ -483,7 +483,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 		}
 
 		blockOffset := int64(ext2fs.SuperBlock.S_block_start + (blockNum * ext2fs.SuperBlock.S_block_s))
-		err := utilities.WriteStruct(file, blockOffset, fileBlock)
+		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
 		if err != nil {
 			return fmt.Errorf("error escribiendo bloque %d: %s", blockNum, err)
 		}
@@ -497,7 +497,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 			oldBlockNum := inode.GetIblock()[i]
 			emptyBlock := &bloques.BloqueArchivo{}
 			blockOffset := int64(ext2fs.SuperBlock.S_block_start + (oldBlockNum * ext2fs.SuperBlock.S_block_s))
-			utilities.WriteStruct(file, blockOffset, emptyBlock)
+			utilitiesP2.WriteStruct(file, blockOffset, emptyBlock)
 			markBlockAsFree(file, ext2fs, oldBlockNum)
 			inode.SetIblock(i, -1)
 			ext2fs.SuperBlock.S_free_blocks_count++
@@ -506,7 +506,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 	}
 
 	// Actualizar el superbloque
-	err := utilities.WriteStruct(file, int64(ext2fs.StartOffset), ext2fs.SuperBlock)
+	err := utilitiesP2.WriteStruct(file, int64(ext2fs.StartOffset), ext2fs.SuperBlock)
 	if err != nil {
 		return fmt.Errorf("error actualizando superbloque: %s", err)
 	}
@@ -515,7 +515,7 @@ func writeContentToFileUser(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem
 	inode.SetSize(contentSize)
 	inode.UpdateModificationTime()
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (inodeNum * ext2fs.SuperBlock.S_inode_s))
-	err = utilities.WriteStruct(file, inodeOffset, inode)
+	err = utilitiesP2.WriteStruct(file, inodeOffset, inode)
 	if err != nil {
 		return fmt.Errorf("error actualizando inodo: %s", err)
 	}

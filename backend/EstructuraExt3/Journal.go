@@ -1,4 +1,4 @@
-package EstructuraExt3
+package EstructuraExt3P2
 
 type Information struct {
 	I_Operation [10]byte // Tipo de operación (10 caracteres)

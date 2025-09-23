@@ -1,8 +1,8 @@
 package main
 
 import (
-	"MIA_2S2025_P1_202307820/commands"
-	"MIA_2S2025_P1_202307820/utilities"
+	commandsP2 "MIA_2S2025_P2_202307820/commands"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"bufio"
 	"fmt"
 	"os"
@@ -89,7 +89,7 @@ func main() {
 			}
 
 			// Parsear el comando
-			cmdParts := utilities.ParseCommand(input)
+			cmdParts := utilitiesP2.ParseCommand(input)
 			if len(cmdParts) == 0 {
 				fmt.Printf("❌ Error en línea %d: Comando vacío o inválido\n", lineNumbers[i])
 				errorCount++
@@ -111,39 +111,39 @@ func main() {
 			commandHasError := false
 			switch strings.ToLower(cmdParts[0]) {
 			case "mkdisk":
-				commands.MKDISK(cmdParts[1:])
+				commandsP2.MKDISK(cmdParts[1:])
 			case "rmdisk":
-				commands.RMDISK(cmdParts[1:])
+				commandsP2.RMDISK(cmdParts[1:])
 			case "fdisk":
-				commands.FDISK(cmdParts[1:])
+				commandsP2.FDISK(cmdParts[1:])
 			case "mount":
-				commands.MOUNT(cmdParts[1:])
+				commandsP2.MOUNT(cmdParts[1:])
 			case "mounted":
-				commands.MOUNTED(cmdParts[1:])
+				commandsP2.MOUNTED(cmdParts[1:])
 			case "mkfs":
-				commands.MKFS(cmdParts[1:])
+				commandsP2.MKFS(cmdParts[1:])
 			case "login":
-				commands.LOGIN(cmdParts[1:])
+				commandsP2.LOGIN(cmdParts[1:])
 			case "logout":
-				commands.LOGOUT(cmdParts[1:])
+				commandsP2.LOGOUT(cmdParts[1:])
 			case "cat":
-				commands.CAT(cmdParts[1:])
+				commandsP2.CAT(cmdParts[1:])
 			case "mkgrp":
-				commands.MKGRP(cmdParts[1:])
+				commandsP2.MKGRP(cmdParts[1:])
 			case "rmgrp":
-				commands.RMGRP(cmdParts[1:])
+				commandsP2.RMGRP(cmdParts[1:])
 			case "mkusr":
-				commands.MKUSR(cmdParts[1:])
+				commandsP2.MKUSR(cmdParts[1:])
 			case "rmusr":
-				commands.RMUSR(cmdParts[1:])
+				commandsP2.RMUSR(cmdParts[1:])
 			case "chgrp":
-				commands.CHGRP(cmdParts[1:])
+				commandsP2.CHGRP(cmdParts[1:])
 			case "mkdir":
-				commands.MKDIR(cmdParts[1:])
+				commandsP2.MKDIR(cmdParts[1:])
 			case "mkfile":
-				commands.MKFILE(cmdParts[1:])
+				commandsP2.MKFILE(cmdParts[1:])
 			case "repo":
-				commands.REP(cmdParts[1:])
+				commandsP2.REP(cmdParts[1:])
 			default:
 				fmt.Printf("Error: Comando '%s' no reconocido\n", cmdParts[0])
 				commandHasError = true

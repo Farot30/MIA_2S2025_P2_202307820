@@ -1,9 +1,9 @@
-package report
+package reportP2
 
 import (
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/utilities"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"os/exec"
@@ -76,7 +76,7 @@ func GenerateInodeReport(diskPath string, partitionStart int32, outputPath strin
 				inodeOffset := ext2fs.SuperBlock.S_inode_start + (inodeNum * int32(ext2fs.SuperBlock.S_inode_s))
 
 				// Leer el inodo
-				err = utilities.ReadStruct(file, int64(inodeOffset), inode)
+				err = utilitiesP2.ReadStruct(file, int64(inodeOffset), inode)
 				if err != nil {
 					return fmt.Errorf("error leyendo el inodo %d: %s", inodeNum, err)
 				}

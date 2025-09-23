@@ -1,10 +1,10 @@
-package commands
+package commandsP2
 
 import (
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/structures"
-	"MIA_2S2025_P1_202307820/utilities"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	structuresP2 "MIA_2S2025_P2_202307820/structures"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,11 +42,11 @@ var mountManager = &MountManager{
 // MOUNT implementa el comando para montar particiones (primarias y lógicas)
 func MOUNT(args []string) {
 	// Parsear parámetros
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	// Validar parámetros requeridos
 	required := []string{"path", "name"}
-	if err := utilities.ValidateRequiredParams(params, required); err != nil {
+	if err := utilitiesP2.ValidateRequiredParams(params, required); err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return
 	}
@@ -61,7 +61,7 @@ func MOUNT(args []string) {
 	}
 
 	// Validar si el disco existe
-	if !utilities.FileExists(path) {
+	if !utilitiesP2.FileExists(path) {
 		fmt.Printf("Error: El disco '%s' no existe\n", path)
 		return
 	}
@@ -75,8 +75,8 @@ func MOUNT(args []string) {
 	defer file.Close()
 
 	// Leer el MBR
-	var mbr structures.MBR
-	if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
+	var mbr structuresP2.MBR
+	if err := utilitiesP2.ReadStruct(file, 0, &mbr); err != nil {
 		fmt.Printf("Error leyendo el MBR: %s\n", err)
 		return
 	}
@@ -120,9 +120,9 @@ func MOUNT(args []string) {
 }
 
 // findAndMountLogicalPartition busca una partición lógica por nombre
-func findAndMountLogicalPartition(file *os.File, mbr *structures.MBR, name, diskPath string) (int32, error) {
+func findAndMountLogicalPartition(file *os.File, mbr *structuresP2.MBR, name, diskPath string) (int32, error) {
 	// Encontrar la partición extendida
-	var extendedPartition *structures.Partition
+	var extendedPartition *structuresP2.Partition
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartType == 'E' && mbr.MbrPartitions[i].PartS > 0 {
 			extendedPartition = &mbr.MbrPartitions[i]
@@ -140,7 +140,7 @@ func findAndMountLogicalPartition(file *os.File, mbr *structures.MBR, name, disk
 
 	currentEBRPos := extendedStart
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		ebr, err := structures.ReadEBR(file, currentEBRPos)
+		ebr, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			break
 		}
@@ -160,7 +160,7 @@ func findAndMountLogicalPartition(file *os.File, mbr *structures.MBR, name, disk
 }
 
 // mountPrimaryPartition monta una partición primaria
-func mountPrimaryPartition(diskPath, partitionName string, partitionIndex int, partitionStart int32, mbr *structures.MBR, file *os.File) {
+func mountPrimaryPartition(diskPath, partitionName string, partitionIndex int, partitionStart int32, mbr *structuresP2.MBR, file *os.File) {
 	mountManager.mutex.Lock()
 	defer mountManager.mutex.Unlock()
 
@@ -207,7 +207,7 @@ func mountPrimaryPartition(diskPath, partitionName string, partitionIndex int, p
 	copy(mbr.MbrPartitions[partitionIndex].PartId[:], []byte(mountID))
 
 	// Escribir el MBR actualizado al disco
-	if err := utilities.WriteStruct(file, 0, mbr); err != nil {
+	if err := utilitiesP2.WriteStruct(file, 0, mbr); err != nil {
 		fmt.Printf("Error actualizando el MBR: %s\n", err)
 		return
 	}
@@ -243,7 +243,7 @@ func mountPrimaryPartition(diskPath, partitionName string, partitionIndex int, p
 }
 
 // mountLogicalPartition monta una partición lógica
-func mountLogicalPartition(diskPath, partitionName string, partitionStart int32, mbr *structures.MBR, file *os.File) {
+func mountLogicalPartition(diskPath, partitionName string, partitionStart int32, mbr *structuresP2.MBR, file *os.File) {
 	mountManager.mutex.Lock()
 	defer mountManager.mutex.Unlock()
 
@@ -317,9 +317,9 @@ func mountLogicalPartition(diskPath, partitionName string, partitionStart int32,
 }
 
 // updateLogicalPartitionStatus actualiza el status de una partición lógica
-func updateLogicalPartitionStatus(file *os.File, mbr *structures.MBR, partitionName string, partitionNumber int, mountID string) error {
+func updateLogicalPartitionStatus(file *os.File, mbr *structuresP2.MBR, partitionName string, partitionNumber int, mountID string) error {
 	// Encontrar la partición extendida
-	var extendedPartition *structures.Partition
+	var extendedPartition *structuresP2.Partition
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartType == 'E' && mbr.MbrPartitions[i].PartS > 0 {
 			extendedPartition = &mbr.MbrPartitions[i]
@@ -337,7 +337,7 @@ func updateLogicalPartitionStatus(file *os.File, mbr *structures.MBR, partitionN
 
 	currentEBRPos := extendedStart
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		ebr, err := structures.ReadEBR(file, currentEBRPos)
+		ebr, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			break
 		}
@@ -347,7 +347,7 @@ func updateLogicalPartitionStatus(file *os.File, mbr *structures.MBR, partitionN
 			ebr.PartMount = 1 // 1 = montada, 0 = no montada
 
 			// Escribir EBR actualizado
-			if err := structures.WriteEBR(file, ebr, currentEBRPos); err != nil {
+			if err := structuresP2.WriteEBR(file, ebr, currentEBRPos); err != nil {
 				return fmt.Errorf("error escribiendo EBR actualizado: %s", err)
 			}
 
@@ -372,7 +372,7 @@ func GetMountedPartition(id string) (MountedPartition, bool) {
 	return partition, exists
 }
 
-func showMountedPartitionDetails(file *os.File, mbr *structures.MBR, partitionIndex int, diskPath string) {
+func showMountedPartitionDetails(file *os.File, mbr *structuresP2.MBR, partitionIndex int, diskPath string) {
 	partition := mbr.MbrPartitions[partitionIndex]
 
 	fmt.Printf("\n--- DETALLES DE LA PARTICIÓN ---\n")

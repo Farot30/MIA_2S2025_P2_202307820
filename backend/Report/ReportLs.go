@@ -1,8 +1,8 @@
-package report
+package reportP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
+	BloquesP2 "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2P2 "MIA_2S2025_P2_202307820/EstructuraExt2"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,7 +17,7 @@ import (
 // contenidos en dirPath dentro del EXT2. Muestra permisos, owner (nombre si existe en users.txt),
 // grupo (nombre si existe), size, fecha/hora modificación, tipo y nombre.
 func GenerateLsReport(diskPath string, partitionStart int32, dirPath string, outputPath string) error {
-	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(diskPath, partitionStart)
+	ext2fs, err := EstructuraExt2P2.ReadEXT2FileSystem(diskPath, partitionStart)
 	if err != nil {
 		return fmt.Errorf("leer EXT2: %v", err)
 	}
@@ -158,19 +158,19 @@ func escapeHTML(s string) string {
 }
 
 // readFolderBlock lee un BloqueCarpeta desde disco y retorna sus entradas no vacías
-func readFolderBlock(f *os.File, fs *EstructuraExt2.EXT2FileSystem, blockNum int32) ([]bloques.B_content, error) {
+func readFolderBlock(f *os.File, fs *EstructuraExt2P2.EXT2FileSystem, blockNum int32) ([]BloquesP2.B_content, error) {
 	offset := int64(fs.SuperBlock.S_block_start) + int64(blockNum)*int64(fs.SuperBlock.S_block_s)
 	buf := make([]byte, fs.SuperBlock.S_block_s)
 	if _, err := f.ReadAt(buf, offset); err != nil {
 		return nil, err
 	}
-	var bc bloques.BloqueCarpeta
+	var bc BloquesP2.BloqueCarpeta
 	if int32(len(buf)) >= bc.GetSize() {
 		copy((*[64]byte)(unsafe.Pointer(&bc))[:], buf[:bc.GetSize()])
 	} else {
 		copy((*[64]byte)(unsafe.Pointer(&bc))[:], buf)
 	}
-	var out []bloques.B_content
+	var out []BloquesP2.B_content
 	for _, e := range bc.B_content {
 		if e.B_inodo != -1 {
 			out = append(out, e)
@@ -180,7 +180,7 @@ func readFolderBlock(f *os.File, fs *EstructuraExt2.EXT2FileSystem, blockNum int
 }
 
 // resolvePathToInode resuelve una ruta absoluta dentro del FS y retorna el número de inodo
-func resolvePathToInode(fs *EstructuraExt2.EXT2FileSystem, f *os.File, p string) (int32, error) {
+func resolvePathToInode(fs *EstructuraExt2P2.EXT2FileSystem, f *os.File, p string) (int32, error) {
 	if p == "/" || p == "" {
 		return 0, nil
 	}
@@ -221,7 +221,7 @@ func resolvePathToInode(fs *EstructuraExt2.EXT2FileSystem, f *os.File, p string)
 			ptrOff := int64(fs.SuperBlock.S_block_start) + int64(ptrBlock)*int64(fs.SuperBlock.S_block_s)
 			ptrBuf := make([]byte, fs.SuperBlock.S_block_s)
 			if _, err := f.ReadAt(ptrBuf, ptrOff); err == nil {
-				var bap bloques.BloqueApuntador
+				var bap BloquesP2.BloqueApuntador
 				if int32(len(ptrBuf)) >= bap.GetSize() {
 					copy((*[64]byte)(unsafe.Pointer(&bap))[:], ptrBuf[:bap.GetSize()])
 				} else {
@@ -267,7 +267,7 @@ type usrEntry struct {
 }
 
 // parseUsersFile intenta leer /users.txt y devuelve mapas: uid->username, gid->groupname
-func parseUsersFile(fs *EstructuraExt2.EXT2FileSystem) (map[int32]usrEntry, map[int32]string) {
+func parseUsersFile(fs *EstructuraExt2P2.EXT2FileSystem) (map[int32]usrEntry, map[int32]string) {
 	users := make(map[int32]usrEntry)
 	groups := make(map[int32]string)
 

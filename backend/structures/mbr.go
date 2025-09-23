@@ -1,4 +1,4 @@
-package structures
+package structuresP2
 
 import (
 	"encoding/binary"

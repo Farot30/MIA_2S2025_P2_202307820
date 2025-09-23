@@ -1,9 +1,10 @@
-package report
+package reportP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
+	bloques "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt2P2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,7 +31,7 @@ func GenerarBloqueReporte(diskPath string, partitionStart int32, outputPath stri
 	}
 	defer file.Close()
 
-	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(diskPath, partitionStart)
+	ext2fs, err := EstructuraExt2P2.ReadEXT2FileSystem(diskPath, partitionStart)
 	if err != nil {
 		return fmt.Errorf("error leyendo sistema de archivos EXT2: %s", err)
 	}
@@ -141,7 +142,7 @@ func generateRootBlockNode(dot *strings.Builder) {
 `)
 }
 
-func findRootDirectoryInode(ext2fs *EstructuraExt2.EXT2FileSystem) int32 {
+func findRootDirectoryInode(ext2fs *EstructuraExt2P2.EXT2FileSystem) int32 {
 	// En EXT2, el inodo 2 es SIEMPRE el directorio raíz por estándar
 	// Primero verificar que el inodo 2 existe y es un directorio
 	if inode, err := ext2fs.ReadInode(2); err == nil {
@@ -215,7 +216,7 @@ func isRootDirectory(ext2fs *EstructuraExt2.EXT2FileSystem, inodeNum int32) bool
 	return hasSelfReference && hasTypicalRootEntries
 }
 
-func isRealFolderBlock(block []byte, ext2fs *EstructuraExt2.EXT2FileSystem) bool {
+func isRealFolderBlock(block []byte, ext2fs *EstructuraExt2P2.EXT2FileSystem) bool {
 	if len(block) < 64 {
 		return false
 	}
@@ -264,7 +265,7 @@ func isRealFolderBlock(block []byte, ext2fs *EstructuraExt2.EXT2FileSystem) bool
 }
 
 // buildInodeBlockMapping construye un mapeo de inodos a sus bloques (mejorado)
-func buildInodeBlockMapping(ext2fs *EstructuraExt2.EXT2FileSystem) map[int32]*InodeBlockMapping {
+func buildInodeBlockMapping(ext2fs *EstructuraExt2P2.EXT2FileSystem) map[int32]*InodeBlockMapping {
 	mapping := make(map[int32]*InodeBlockMapping)
 
 	// Leer todos los inodos activos
@@ -294,7 +295,7 @@ func buildInodeBlockMapping(ext2fs *EstructuraExt2.EXT2FileSystem) map[int32]*In
 	return mapping
 }
 
-func generateImprovedBlockNode(dot *strings.Builder, block []byte, blockNum int32, blockType BlockType, edges *[]Edge, ext2fs *EstructuraExt2.EXT2FileSystem, inodeMapping map[int32]*InodeBlockMapping) {
+func generateImprovedBlockNode(dot *strings.Builder, block []byte, blockNum int32, blockType BlockType, edges *[]Edge, ext2fs *EstructuraExt2P2.EXT2FileSystem, inodeMapping map[int32]*InodeBlockMapping) {
 
 	// CORRECCIÓN ESPECÍFICA PARA EL BLOQUE 0
 	if blockNum == 0 {
@@ -318,7 +319,7 @@ func generateImprovedBlockNode(dot *strings.Builder, block []byte, blockNum int3
 	}
 }
 
-func generateFolderBlockNode(dot *strings.Builder, block []byte, blockNum int32, edges *[]Edge, ext2fs *EstructuraExt2.EXT2FileSystem) {
+func generateFolderBlockNode(dot *strings.Builder, block []byte, blockNum int32, edges *[]Edge, ext2fs *EstructuraExt2P2.EXT2FileSystem) {
 	bloqueCarpeta := &bloques.BloqueCarpeta{}
 
 	if int32(len(block)) >= bloqueCarpeta.GetSize() {
@@ -356,7 +357,7 @@ func generateFolderBlockNode(dot *strings.Builder, block []byte, blockNum int32,
 	dot.WriteString(fmt.Sprintf("  Bloque%d [label=%s, fillcolor=\"lightblue\", style=\"filled,bold\"];\n", blockNum, label))
 }
 
-func connectSequentialBlocks(edges *[]Edge, inodeNum int32, ext2fs *EstructuraExt2.EXT2FileSystem) {
+func connectSequentialBlocks(edges *[]Edge, inodeNum int32, ext2fs *EstructuraExt2P2.EXT2FileSystem) {
 	inode, err := ext2fs.ReadInode(inodeNum)
 	if err != nil {
 		return
@@ -425,7 +426,7 @@ func generateFileBlockNodes(dot *strings.Builder, block []byte, blockNum int32) 
 	dot.WriteString(fmt.Sprintf("  Bloque%d [label=%s, fillcolor=\"lightyellow\", style=\"filled\"];\n", blockNum, label))
 }
 
-func parseBlockPointersManually(bloqueApuntador *bloques.BloqueApuntador, block []byte, ext2fs *EstructuraExt2.EXT2FileSystem) bool {
+func parseBlockPointersManually(bloqueApuntador *bloques.BloqueApuntador, block []byte, ext2fs *EstructuraExt2P2.EXT2FileSystem) bool {
 	if len(block) < 4 {
 		return false
 	}
@@ -458,7 +459,7 @@ func parseBlockPointersManually(bloqueApuntador *bloques.BloqueApuntador, block 
 	return validParsed > 0
 }
 
-func isContextualPointerBlock(block []byte, blockNum int32, ext2fs *EstructuraExt2.EXT2FileSystem) bool {
+func isContextualPointerBlock(block []byte, blockNum int32, ext2fs *EstructuraExt2P2.EXT2FileSystem) bool {
 	// Verificar si este bloque está referenciado como un bloque indirecto por algún inodo
 	for inodeNum := int32(0); inodeNum < ext2fs.SuperBlock.S_inodes_count; inodeNum++ {
 		inode, err := ext2fs.ReadInode(inodeNum)
@@ -476,7 +477,7 @@ func isContextualPointerBlock(block []byte, blockNum int32, ext2fs *EstructuraEx
 	return false
 }
 
-func generatePointerBlockNode(dot *strings.Builder, block []byte, blockNum int32, edges *[]Edge, ext2fs *EstructuraExt2.EXT2FileSystem) {
+func generatePointerBlockNode(dot *strings.Builder, block []byte, blockNum int32, edges *[]Edge, ext2fs *EstructuraExt2P2.EXT2FileSystem) {
 	// Validar que realmente es un bloque de apuntadores con criterios más flexibles
 	if !isValidPointerBlock(block, ext2fs) {
 		// Si no es detectado como bloque de apuntadores, intentar una verificación alternativa
@@ -572,7 +573,7 @@ func generateUnknownBlockNode(dot *strings.Builder, block []byte, blockNum int32
 	dot.WriteString(fmt.Sprintf("  Bloque%d [label=%s, fillcolor=\"lightgray\", style=\"filled\"];\n", blockNum, label))
 }
 
-func isValidPointerBlock(block []byte, ext2fs *EstructuraExt2.EXT2FileSystem) bool {
+func isValidPointerBlock(block []byte, ext2fs *EstructuraExt2P2.EXT2FileSystem) bool {
 	if len(block) < 4 {
 		return false
 	}
@@ -665,7 +666,7 @@ func isTextBlock(block []byte) bool {
 	return isText
 }
 
-func connectIndirectBlocks(edges *[]Edge, pointerBlockNum int32, ext2fs *EstructuraExt2.EXT2FileSystem, level int) {
+func connectIndirectBlocks(edges *[]Edge, pointerBlockNum int32, ext2fs *EstructuraExt2P2.EXT2FileSystem, level int) {
 	if level <= 0 || pointerBlockNum < 0 || pointerBlockNum >= ext2fs.SuperBlock.S_blocks_count {
 		return
 	}
@@ -711,7 +712,7 @@ func connectIndirectBlocks(edges *[]Edge, pointerBlockNum int32, ext2fs *Estruct
 	}
 }
 
-func mapBlockTypesWithInodeInfo(ext2fs *EstructuraExt2.EXT2FileSystem, inodeMapping map[int32]*InodeBlockMapping) map[int32]BlockType {
+func mapBlockTypesWithInodeInfo(ext2fs *EstructuraExt2P2.EXT2FileSystem, inodeMapping map[int32]*InodeBlockMapping) map[int32]BlockType {
 	blockTypes := make(map[int32]BlockType)
 
 	// Primero, mapear bloques conocidos desde los inodos

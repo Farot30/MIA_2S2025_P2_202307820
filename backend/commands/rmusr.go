@@ -1,11 +1,11 @@
-package commands
+package commandsP2
 
 import (
-	bloques "MIA_2S2025_P1_202307820/Bloques"
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	session "MIA_2S2025_P1_202307820/Session"
-	estructuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/utilities"
+	bloques "MIA_2S2025_P2_202307820/Bloques"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	session "MIA_2S2025_P2_202307820/Session"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"strings"
@@ -31,7 +31,7 @@ func RMUSR(args []string) {
 	}
 
 	// 4. Parsear parámetros
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	username, exists := params["user"]
 	if !exists || username == "" {
@@ -101,7 +101,7 @@ func removeUser(partition MountedPartition, username string) error {
 	// Leer el inodo del archivo users.txt
 	usersInode := &estructuraArchivoCarpeta.Inodo{}
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (usersInodeNum * ext2fs.SuperBlock.S_inode_s))
-	err = utilities.ReadStruct(file, inodeOffset, usersInode)
+	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
 	if err != nil {
 		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
 	}
@@ -220,7 +220,7 @@ func writeContentToFileRMUSR(file *os.File, ext2fs *EstructuraExt2.EXT2FileSyste
 
 		// Escribir el bloque al disco
 		blockOffset := int64(ext2fs.SuperBlock.S_block_start + (blockNum * ext2fs.SuperBlock.S_block_s))
-		err := utilities.WriteStruct(file, blockOffset, fileBlock)
+		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
 		if err != nil {
 			return fmt.Errorf("error escribiendo bloque %d: %s", blockNum, err)
 		}
@@ -235,7 +235,7 @@ func writeContentToFileRMUSR(file *os.File, ext2fs *EstructuraExt2.EXT2FileSyste
 
 	// Escribir el inodo actualizado
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (inodeNum * ext2fs.SuperBlock.S_inode_s))
-	err := utilities.WriteStruct(file, inodeOffset, inode)
+	err := utilitiesP2.WriteStruct(file, inodeOffset, inode)
 	if err != nil {
 		return fmt.Errorf("error actualizando inodo: %s", err)
 	}

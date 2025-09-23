@@ -1,8 +1,9 @@
-package commands
+package commandsP2
 
 import (
-	"MIA_2S2025_P1_202307820/structures"
-	"MIA_2S2025_P1_202307820/utilities"
+	structuresP2 "MIA_2S2025_P2_202307820/structures"
+
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,11 +23,11 @@ type LogicalSpace struct {
 // FDISK implementa el comando para crear particiones en discos virtuales
 func FDISK(args []string) {
 	// Parsear parámetros
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	// Validar parámetros requeridos básicos
 	required := []string{"path", "name"}
-	if err := utilities.ValidateRequiredParams(params, required); err != nil {
+	if err := utilitiesP2.ValidateRequiredParams(params, required); err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return
 	}
@@ -123,7 +124,7 @@ func FDISK(args []string) {
 	}
 
 	// Validar si el disco existe
-	if !utilities.FileExists(path) {
+	if !utilitiesP2.FileExists(path) {
 		fmt.Printf("Error: El disco '%s' no existe\n", path)
 		return
 	}
@@ -137,8 +138,8 @@ func FDISK(args []string) {
 	defer file.Close()
 
 	// Leer el MBR
-	var mbr structures.MBR
-	if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
+	var mbr structuresP2.MBR
+	if err := utilitiesP2.ReadStruct(file, 0, &mbr); err != nil {
 		fmt.Printf("Error leyendo el MBR: %s\n", err)
 		return
 	}
@@ -154,7 +155,7 @@ func FDISK(args []string) {
 }
 
 // createPartition crea una nueva partición
-func createPartition(mbr *structures.MBR, file *os.File, name, partType string, size int32, fit byte) {
+func createPartition(mbr *structuresP2.MBR, file *os.File, name, partType string, size int32, fit byte) {
 	// Validar restricciones según el tipo de partición
 	if err := validatePartitionConstraints(mbr, partType, name); err != nil {
 		fmt.Printf("Error: %s\n", err)
@@ -182,7 +183,7 @@ func createPartition(mbr *structures.MBR, file *os.File, name, partType string, 
 }
 
 // validatePartitionConstraints valida las restricciones de particiones
-func validatePartitionConstraints(mbr *structures.MBR, partType, name string) error {
+func validatePartitionConstraints(mbr *structuresP2.MBR, partType, name string) error {
 	primaryAndExtendedCount := 0
 	hasExtended := false
 
@@ -226,7 +227,7 @@ func validatePartitionConstraints(mbr *structures.MBR, partType, name string) er
 }
 
 // findAvailableSpace busca espacio disponible según el algoritmo de ajuste
-func findAvailableSpace(mbr *structures.MBR, size int32, fit byte) (int32, error) {
+func findAvailableSpace(mbr *structuresP2.MBR, size int32, fit byte) (int32, error) {
 	// Esta función implementaría la lógica de First Fit, Best Fit o Worst Fit
 	// Por ahora, implementación básica
 
@@ -240,18 +241,18 @@ func findAvailableSpace(mbr *structures.MBR, size int32, fit byte) (int32, error
 		}
 	}
 
-	available := diskSize - used - int32(unsafe.Sizeof(structures.MBR{}))
+	available := diskSize - used - int32(unsafe.Sizeof(structuresP2.MBR{}))
 
 	if available < size {
 		return 0, fmt.Errorf("no hay suficiente espacio disponible. Requerido: %d bytes, Disponible: %d bytes", size, available)
 	}
 
 	// Retornar posición donde empezará la partición
-	return int32(unsafe.Sizeof(structures.MBR{})) + used, nil
+	return int32(unsafe.Sizeof(structuresP2.MBR{})) + used, nil
 }
 
 // Funciones auxiliares para crear cada tipo de partición
-func createPrimaryPartition(mbr *structures.MBR, file *os.File, name string, start, size int32, fit byte) {
+func createPrimaryPartition(mbr *structuresP2.MBR, file *os.File, name string, start, size int32, fit byte) {
 	// Encontrar slot libre
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartS == 0 {
@@ -263,7 +264,7 @@ func createPrimaryPartition(mbr *structures.MBR, file *os.File, name string, sta
 			copy(mbr.MbrPartitions[i].PartName[:], name)
 
 			// Escribir MBR actualizado
-			if err := utilities.WriteStruct(file, 0, mbr); err != nil {
+			if err := utilitiesP2.WriteStruct(file, 0, mbr); err != nil {
 				fmt.Printf("Error escribiendo MBR: %s\n", err)
 				return
 			}
@@ -277,7 +278,7 @@ func createPrimaryPartition(mbr *structures.MBR, file *os.File, name string, sta
 	fmt.Println("Error: No hay slots disponibles para particiones")
 }
 
-func createExtendedPartition(mbr *structures.MBR, file *os.File, name string, start, size int32, fit byte) {
+func createExtendedPartition(mbr *structuresP2.MBR, file *os.File, name string, start, size int32, fit byte) {
 	// Similar a createPrimaryPartition pero con Type = 'E'
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartS == 0 {
@@ -289,7 +290,7 @@ func createExtendedPartition(mbr *structures.MBR, file *os.File, name string, st
 			copy(mbr.MbrPartitions[i].PartName[:], name)
 
 			// Escribir MBR actualizado
-			if err := utilities.WriteStruct(file, 0, mbr); err != nil {
+			if err := utilitiesP2.WriteStruct(file, 0, mbr); err != nil {
 				fmt.Printf("Error escribiendo MBR: %s\n", err)
 				return
 			}
@@ -301,9 +302,9 @@ func createExtendedPartition(mbr *structures.MBR, file *os.File, name string, st
 	}
 }
 
-func createLogicalPartition(mbr *structures.MBR, file *os.File, name string, start, size int32, fit byte) {
+func createLogicalPartition(mbr *structuresP2.MBR, file *os.File, name string, start, size int32, fit byte) {
 	// 1. Encontrar la partición extendida
-	var extendedPartition *structures.Partition
+	var extendedPartition *structuresP2.Partition
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartType == 'E' && mbr.MbrPartitions[i].PartS > 0 {
 			extendedPartition = &mbr.MbrPartitions[i]
@@ -324,7 +325,7 @@ func createLogicalPartition(mbr *structures.MBR, file *os.File, name string, sta
 	}
 
 	// 3. Crear el nuevo EBR
-	newEBR := structures.NewEBRWithData(fit, dataStart, size, name, -1)
+	newEBR := structuresP2.NewEBRWithData(fit, dataStart, size, name, -1)
 
 	// 4. Insertar el EBR en la cadena de EBRs
 	if err := insertEBRInChain(file, extendedPartition, newEBR, ebrPosition); err != nil {
@@ -333,7 +334,7 @@ func createLogicalPartition(mbr *structures.MBR, file *os.File, name string, sta
 	}
 
 	// 5. Escribir el nuevo EBR al disco
-	if err := structures.WriteEBR(file, newEBR, ebrPosition); err != nil {
+	if err := structuresP2.WriteEBR(file, newEBR, ebrPosition); err != nil {
 		fmt.Printf("Error escribiendo EBR: %s\n", err)
 		return
 	}
@@ -343,8 +344,8 @@ func createLogicalPartition(mbr *structures.MBR, file *os.File, name string, sta
 }
 
 // findLogicalPartitionSpace busca espacio disponible dentro de la partición extendida
-func findLogicalPartitionSpace(file *os.File, extendedPartition *structures.Partition, size int32, fit byte, name string) (int32, int32, error) {
-	ebrSize := int32(unsafe.Sizeof(structures.EBR{}))
+func findLogicalPartitionSpace(file *os.File, extendedPartition *structuresP2.Partition, size int32, fit byte, name string) (int32, int32, error) {
+	ebrSize := int32(unsafe.Sizeof(structuresP2.EBR{}))
 	requiredSpace := size + ebrSize // EBR + datos
 
 	extendedStart := extendedPartition.PartStart
@@ -356,7 +357,7 @@ func findLogicalPartitionSpace(file *os.File, extendedPartition *structures.Part
 	// Recorrer la cadena de EBRs para encontrar particiones lógicas existentes
 	currentEBRPos := extendedStart
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		ebr, err := structures.ReadEBR(file, currentEBRPos)
+		ebr, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			// Si no se puede leer, no hay más EBRs válidos
 			break
@@ -399,12 +400,12 @@ func findLogicalPartitionSpace(file *os.File, extendedPartition *structures.Part
 }
 
 // insertEBRInChain inserta el EBR en la cadena de EBRs existente
-func insertEBRInChain(file *os.File, extendedPartition *structures.Partition, newEBR *structures.EBR, newEBRPos int32) error {
+func insertEBRInChain(file *os.File, extendedPartition *structuresP2.Partition, newEBR *structuresP2.EBR, newEBRPos int32) error {
 	extendedStart := extendedPartition.PartStart
 	extendedEnd := extendedStart + extendedPartition.PartS
 
 	// Verificar si es el primer EBR
-	firstEBR, err := structures.ReadEBR(file, extendedStart)
+	firstEBR, err := structuresP2.ReadEBR(file, extendedStart)
 	if err != nil || firstEBR.IsEmpty() {
 		// Es el primer EBR, no hay cadena que actualizar
 		return nil
@@ -412,11 +413,11 @@ func insertEBRInChain(file *os.File, extendedPartition *structures.Partition, ne
 
 	// Buscar la posición correcta en la cadena ordenada
 	currentEBRPos := extendedStart
-	var previousEBR *structures.EBR
+	var previousEBR *structuresP2.EBR
 	var previousEBRPos int32
 
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		currentEBR, err := structures.ReadEBR(file, currentEBRPos)
+		currentEBR, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil || currentEBR.IsEmpty() {
 			break
 		}
@@ -427,7 +428,7 @@ func insertEBRInChain(file *os.File, extendedPartition *structures.Partition, ne
 			if previousEBR != nil {
 				previousEBR.PartNext = newEBRPos
 				// Escribir el EBR anterior actualizado
-				if err := structures.WriteEBR(file, previousEBR, previousEBRPos); err != nil {
+				if err := structuresP2.WriteEBR(file, previousEBR, previousEBRPos); err != nil {
 					return err
 				}
 			}
@@ -449,7 +450,7 @@ func insertEBRInChain(file *os.File, extendedPartition *structures.Partition, ne
 	if previousEBR != nil {
 		previousEBR.PartNext = newEBRPos
 		// Escribir el EBR anterior actualizado
-		if err := structures.WriteEBR(file, previousEBR, previousEBRPos); err != nil {
+		if err := structuresP2.WriteEBR(file, previousEBR, previousEBRPos); err != nil {
 			return err
 		}
 	}
@@ -581,7 +582,7 @@ func findWorstFitLogical(extStart, extEnd int32, existing []LogicalSpace, requir
 	return worstEBRPos, worstDataStart, nil
 }
 
-func deletePartition(mbr *structures.MBR, file *os.File, name, deleteType string) {
+func deletePartition(mbr *structuresP2.MBR, file *os.File, name, deleteType string) {
 	// Buscar la partición por nombre
 	partitionFound := false
 	var partitionIndex int = -1
@@ -625,12 +626,12 @@ func deletePartition(mbr *structures.MBR, file *os.File, name, deleteType string
 }
 
 // deletePartitionFast elimina la partición solo limpiando los metadatos
-func deletePartitionFast(mbr *structures.MBR, file *os.File, index int, name string, partType byte) {
+func deletePartitionFast(mbr *structuresP2.MBR, file *os.File, index int, name string, partType byte) {
 	// Limpiar la entrada en el MBR
-	mbr.MbrPartitions[index] = structures.Partition{}
+	mbr.MbrPartitions[index] = structuresP2.Partition{}
 
 	// Escribir MBR actualizado
-	if err := utilities.WriteStruct(file, 0, mbr); err != nil {
+	if err := utilitiesP2.WriteStruct(file, 0, mbr); err != nil {
 		fmt.Printf("Error escribiendo MBR actualizado: %s\n", err)
 		return
 	}
@@ -640,7 +641,7 @@ func deletePartitionFast(mbr *structures.MBR, file *os.File, index int, name str
 }
 
 // deletePartitionFull elimina la partición y limpia completamente los datos
-func deletePartitionFull(mbr *structures.MBR, file *os.File, index int, name string, partType byte) {
+func deletePartitionFull(mbr *structuresP2.MBR, file *os.File, index int, name string, partType byte) {
 	partition := mbr.MbrPartitions[index]
 
 	// Llenar con ceros toda la partición
@@ -681,10 +682,10 @@ func deletePartitionFull(mbr *structures.MBR, file *os.File, index int, name str
 	}
 
 	// Limpiar la entrada en el MBR
-	mbr.MbrPartitions[index] = structures.Partition{}
+	mbr.MbrPartitions[index] = structuresP2.Partition{}
 
 	// Escribir MBR actualizado
-	if err := utilities.WriteStruct(file, 0, mbr); err != nil {
+	if err := utilitiesP2.WriteStruct(file, 0, mbr); err != nil {
 		fmt.Printf("Error escribiendo MBR actualizado: %s\n", err)
 		return
 	}
@@ -694,9 +695,9 @@ func deletePartitionFull(mbr *structures.MBR, file *os.File, index int, name str
 }
 
 // deleteLogicalPartition elimina una partición lógica
-func deleteLogicalPartition(mbr *structures.MBR, file *os.File, name, deleteType string) error {
+func deleteLogicalPartition(mbr *structuresP2.MBR, file *os.File, name, deleteType string) error {
 	// Encontrar la partición extendida
-	var extendedPartition *structures.Partition
+	var extendedPartition *structuresP2.Partition
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartType == 'E' && mbr.MbrPartitions[i].PartS > 0 {
 			extendedPartition = &mbr.MbrPartitions[i]
@@ -714,10 +715,10 @@ func deleteLogicalPartition(mbr *structures.MBR, file *os.File, name, deleteType
 
 	currentEBRPos := extendedStart
 	var previousEBRPos int32 = -1
-	var previousEBR *structures.EBR
+	var previousEBR *structuresP2.EBR
 
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		currentEBR, err := structures.ReadEBR(file, currentEBRPos)
+		currentEBR, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			break
 		}
@@ -749,26 +750,26 @@ func deleteLogicalPartition(mbr *structures.MBR, file *os.File, name, deleteType
 			if previousEBR != nil {
 				// No es el primer EBR, actualizar el anterior
 				previousEBR.PartNext = currentEBR.PartNext
-				if err := structures.WriteEBR(file, previousEBR, previousEBRPos); err != nil {
+				if err := structuresP2.WriteEBR(file, previousEBR, previousEBRPos); err != nil {
 					return fmt.Errorf("error actualizando EBR anterior: %s", err)
 				}
 			} else {
 				// Es el primer EBR, crear un EBR vacío o mover el siguiente
 				if currentEBR.PartNext != -1 {
 					// Mover el siguiente EBR al inicio
-					nextEBR, err := structures.ReadEBR(file, currentEBR.PartNext)
+					nextEBR, err := structuresP2.ReadEBR(file, currentEBR.PartNext)
 					if err != nil {
 						return fmt.Errorf("error leyendo siguiente EBR: %s", err)
 					}
-					if err := structures.WriteEBR(file, nextEBR, extendedStart); err != nil {
+					if err := structuresP2.WriteEBR(file, nextEBR, extendedStart); err != nil {
 						return fmt.Errorf("error escribiendo EBR movido: %s", err)
 					}
 				}
 			}
 
 			// Limpiar el EBR actual
-			emptyEBR := structures.NewEBR()
-			if err := structures.WriteEBR(file, emptyEBR, currentEBRPos); err != nil {
+			emptyEBR := structuresP2.NewEBR()
+			if err := structuresP2.WriteEBR(file, emptyEBR, currentEBRPos); err != nil {
 				return fmt.Errorf("error limpiando EBR: %s", err)
 			}
 
@@ -788,7 +789,7 @@ func deleteLogicalPartition(mbr *structures.MBR, file *os.File, name, deleteType
 
 	return fmt.Errorf("partición lógica '%s' no encontrada", name)
 }
-func modifyPartition(mbr *structures.MBR, file *os.File, name string, add int32) {
+func modifyPartition(mbr *structuresP2.MBR, file *os.File, name string, add int32) {
 	// Buscar la partición por nombre
 	partitionFound := false
 	var partitionIndex int = -1
@@ -831,7 +832,7 @@ func modifyPartition(mbr *structures.MBR, file *os.File, name string, add int32)
 }
 
 // expandPartition expande una partición agregando espacio
-func expandPartition(mbr *structures.MBR, file *os.File, index int, addSize int32) error {
+func expandPartition(mbr *structuresP2.MBR, file *os.File, index int, addSize int32) error {
 	partition := &mbr.MbrPartitions[index]
 	partName := strings.TrimRight(string(partition.PartName[:]), "\x00")
 
@@ -858,7 +859,7 @@ func expandPartition(mbr *structures.MBR, file *os.File, index int, addSize int3
 	partition.PartS += addSize
 
 	// Escribir MBR actualizado
-	if err := utilities.WriteStruct(file, 0, mbr); err != nil {
+	if err := utilitiesP2.WriteStruct(file, 0, mbr); err != nil {
 		return fmt.Errorf("error escribiendo MBR actualizado: %s", err)
 	}
 
@@ -871,7 +872,7 @@ func expandPartition(mbr *structures.MBR, file *os.File, index int, addSize int3
 }
 
 // shrinkPartition reduce el tamaño de una partición
-func shrinkPartition(mbr *structures.MBR, file *os.File, index int, reduceSize int32) error {
+func shrinkPartition(mbr *structuresP2.MBR, file *os.File, index int, reduceSize int32) error {
 	partition := &mbr.MbrPartitions[index]
 	partName := strings.TrimRight(string(partition.PartName[:]), "\x00")
 
@@ -909,7 +910,7 @@ func shrinkPartition(mbr *structures.MBR, file *os.File, index int, reduceSize i
 	partition.PartS = newSize
 
 	// Escribir MBR actualizado
-	if err := utilities.WriteStruct(file, 0, mbr); err != nil {
+	if err := utilitiesP2.WriteStruct(file, 0, mbr); err != nil {
 		return fmt.Errorf("error escribiendo MBR actualizado: %s", err)
 	}
 
@@ -922,9 +923,9 @@ func shrinkPartition(mbr *structures.MBR, file *os.File, index int, reduceSize i
 }
 
 // modifyLogicalPartition modifica una partición lógica
-func modifyLogicalPartition(mbr *structures.MBR, file *os.File, name string, add int32) error {
+func modifyLogicalPartition(mbr *structuresP2.MBR, file *os.File, name string, add int32) error {
 	// Encontrar la partición extendida
-	var extendedPartition *structures.Partition
+	var extendedPartition *structuresP2.Partition
 	for i := range mbr.MbrPartitions {
 		if mbr.MbrPartitions[i].PartType == 'E' && mbr.MbrPartitions[i].PartS > 0 {
 			extendedPartition = &mbr.MbrPartitions[i]
@@ -942,7 +943,7 @@ func modifyLogicalPartition(mbr *structures.MBR, file *os.File, name string, add
 
 	currentEBRPos := extendedStart
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		currentEBR, err := structures.ReadEBR(file, currentEBRPos)
+		currentEBR, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			break
 		}
@@ -968,13 +969,13 @@ func modifyLogicalPartition(mbr *structures.MBR, file *os.File, name string, add
 }
 
 // expandLogicalPartition expande una partición lógica
-func expandLogicalPartition(file *os.File, ebr *structures.EBR, ebrPos int32, addSize int32, extendedEnd int32) error {
+func expandLogicalPartition(file *os.File, ebr *structuresP2.EBR, ebrPos int32, addSize int32, extendedEnd int32) error {
 	partitionEnd := ebr.PartStart + ebr.PartS
 
 	// Verificar espacio disponible (hasta el final de la partición extendida o siguiente EBR)
 	availableSpace := extendedEnd - partitionEnd
 	if ebr.HasNext() {
-		nextEBR, err := structures.ReadEBR(file, ebr.PartNext)
+		nextEBR, err := structuresP2.ReadEBR(file, ebr.PartNext)
 		if err == nil {
 			// Usar nextEBR correctamente:
 			availableSpace = nextEBR.PartStart - partitionEnd // Cambio aquí
@@ -990,7 +991,7 @@ func expandLogicalPartition(file *os.File, ebr *structures.EBR, ebrPos int32, ad
 	ebr.PartS += addSize
 
 	// Escribir EBR actualizado
-	if err := structures.WriteEBR(file, ebr, ebrPos); err != nil {
+	if err := structuresP2.WriteEBR(file, ebr, ebrPos); err != nil {
 		return fmt.Errorf("error escribiendo EBR actualizado: %s", err)
 	}
 
@@ -1003,7 +1004,7 @@ func expandLogicalPartition(file *os.File, ebr *structures.EBR, ebrPos int32, ad
 }
 
 // shrinkLogicalPartition reduce una partición lógica
-func shrinkLogicalPartition(file *os.File, ebr *structures.EBR, ebrPos int32, reduceSize int32) error {
+func shrinkLogicalPartition(file *os.File, ebr *structuresP2.EBR, ebrPos int32, reduceSize int32) error {
 	if ebr.PartS <= reduceSize {
 		return fmt.Errorf("no se puede reducir la partición a un tamaño menor o igual a cero")
 	}
@@ -1027,7 +1028,7 @@ func shrinkLogicalPartition(file *os.File, ebr *structures.EBR, ebrPos int32, re
 	}
 
 	// Escribir EBR actualizado
-	if err := structures.WriteEBR(file, ebr, ebrPos); err != nil {
+	if err := structuresP2.WriteEBR(file, ebr, ebrPos); err != nil {
 		return fmt.Errorf("error escribiendo EBR actualizado: %s", err)
 	}
 
@@ -1050,8 +1051,8 @@ func showDiskStatus(diskPath string) {
 	}
 	defer file.Close()
 
-	var mbr structures.MBR
-	if err := utilities.ReadStruct(file, 0, &mbr); err != nil {
+	var mbr structuresP2.MBR
+	if err := utilitiesP2.ReadStruct(file, 0, &mbr); err != nil {
 		fmt.Printf("Error leyendo MBR: %s\n", err)
 		return
 	}
@@ -1111,7 +1112,7 @@ func showDiskStatus(diskPath string) {
 }
 
 // showLogicalPartitions muestra las particiones lógicas dentro de una extendida
-func showLogicalPartitions(file *os.File, extendedPartition structures.Partition) {
+func showLogicalPartitions(file *os.File, extendedPartition structuresP2.Partition) {
 	fmt.Printf("      PARTICIONES LÓGICAS:\n")
 
 	extendedStart := extendedPartition.PartStart
@@ -1120,7 +1121,7 @@ func showLogicalPartitions(file *os.File, extendedPartition structures.Partition
 	logicalCount := 0
 
 	for currentEBRPos != -1 && currentEBRPos < extendedEnd {
-		ebr, err := structures.ReadEBR(file, currentEBRPos)
+		ebr, err := structuresP2.ReadEBR(file, currentEBRPos)
 		if err != nil {
 			break
 		}

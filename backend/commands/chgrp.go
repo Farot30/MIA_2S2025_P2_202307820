@@ -1,10 +1,10 @@
-package commands
+package commandsP2
 
 import (
-	EstructuraExt2 "MIA_2S2025_P1_202307820/EstructuraExt2"
-	session "MIA_2S2025_P1_202307820/Session"
-	structuraArchivoCarpeta "MIA_2S2025_P1_202307820/estructuraArchivoCarpeta"
-	"MIA_2S2025_P1_202307820/utilities"
+	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	session "MIA_2S2025_P2_202307820/Session"
+	structuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"strings"
@@ -27,7 +27,7 @@ func CHGRP(args []string) {
 	}
 
 	// parsear parámetros
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	usarname := strings.Trim(params["user"], "\"")
 	if usarname == "" {
@@ -90,7 +90,7 @@ func CambiarGrupoUsuario(partition MountedPartition, username string, groupName 
 	// Leer el inodo de users.txt
 	usersInode := &structuraArchivoCarpeta.Inodo{}
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (usersInodeNum * ext2fs.SuperBlock.S_inode_s))
-	err = utilities.ReadStruct(file, inodeOffset, usersInode)
+	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
 	if err != nil {
 		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
 	}

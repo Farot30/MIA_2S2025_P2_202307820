@@ -1,7 +1,7 @@
-package commands
+package commandsP2
 
 import (
-	"MIA_2S2025_P1_202307820/utilities"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,11 +10,11 @@ import (
 
 func RMDISK(arg []string) {
 	//parsear parametros
-	params := utilities.ParseParameters(arg)
+	params := utilitiesP2.ParseParameters(arg)
 
 	//validar parametros requeridos
 	required := []string{"path"}
-	if err := utilities.ValidateRequiredParams(params, required); err != nil {
+	if err := utilitiesP2.ValidateRequiredParams(params, required); err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return
 	}

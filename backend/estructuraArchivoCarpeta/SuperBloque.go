@@ -1,4 +1,4 @@
-package estructuraarchivocarpeta
+package EstructuraarchivocarpetaP2
 
 import (
 	"time"

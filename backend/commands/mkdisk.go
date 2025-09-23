@@ -1,8 +1,8 @@
-package commands
+package commandsP2
 
 import (
-	"MIA_2S2025_P1_202307820/structures"
-	"MIA_2S2025_P1_202307820/utilities"
+	structuresP2 "MIA_2S2025_P2_202307820/structures"
+	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,11 +13,11 @@ import (
 // MKDISK implementa el comando para crear discos virtuales
 func MKDISK(args []string) {
 	// Parsear parámetros
-	params := utilities.ParseParameters(args)
+	params := utilitiesP2.ParseParameters(args)
 
 	// Validar parámetros requeridos
 	required := []string{"size", "path"}
-	if err := utilities.ValidateRequiredParams(params, required); err != nil {
+	if err := utilitiesP2.ValidateRequiredParams(params, required); err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return
 	}
@@ -67,13 +67,13 @@ func MKDISK(args []string) {
 	}
 
 	// Verificar si el archivo ya existe
-	if utilities.FileExists(path) {
+	if utilitiesP2.FileExists(path) {
 		fmt.Printf("Error: El archivo '%s' ya existe\n", path)
 		return
 	}
 
 	// Crear directorios si no existen
-	if err := utilities.CreateDirectoryIfNotExists(path); err != nil {
+	if err := utilitiesP2.CreateDirectoryIfNotExists(path); err != nil {
 		fmt.Printf("Error creando directorios: %s\n", err)
 		return
 	}
@@ -97,8 +97,8 @@ func MKDISK(args []string) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
 	if err == nil {
 		defer file.Close()
-		var mbr structures.MBR
-		if utilities.ReadStruct(file, 0, &mbr) == nil {
+		var mbr structuresP2.MBR
+		if utilitiesP2.ReadStruct(file, 0, &mbr) == nil {
 			fmt.Printf("Signature: %d\n", mbr.MbrDskSignature)
 			fmt.Printf("Fecha creación: %s\n", strings.TrimRight(string(mbr.MbrFechaCreacion[:]), "\x00"))
 			fmt.Printf("Tamaño MBR: %d bytes\n", mbr.GetSize())
@@ -132,7 +132,7 @@ func createDiskFile(path string, size int32, fit byte) error {
 	defer file.Close()
 
 	// Crear el MBR
-	mbr := structures.NewMBR(size, fit)
+	mbr := structuresP2.NewMBR(size, fit)
 
 	// Escribir el MBR al inicio del archivo
 	mbrBytes := mbr.ToBytes()
