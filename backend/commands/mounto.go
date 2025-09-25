@@ -451,3 +451,73 @@ func showCurrentMountStatus() {
 
 	fmt.Printf("=====================================\n")
 }
+
+func UNMOUNT(args []string) {
+	// Parsear parámetros
+	params := utilitiesP2.ParseParameters(args)
+
+	required := []string{"id"}
+	if err := utilitiesP2.ValidateRequiredParams(params, required); err != nil {
+		fmt.Printf("Error: %s\n", err)
+		return
+	}
+
+	id := strings.ToUpper(params["id"])
+
+	MountedPartition, exists := GetMountedPartition(id)
+	if !exists {
+		fmt.Printf("Error: No hay ninguna partición montada con ID '%s'\n", id)
+		return
+	}
+
+	mountManager.mutex.Lock()
+	defer mountManager.mutex.Unlock()
+
+	// Abrir el archivo del disco
+	file, err := os.OpenFile(MountedPartition.Path, os.O_RDWR, 0666)
+	if err != nil {
+		fmt.Printf("Error abriendo el disco: %s\n", err)
+		return
+	}
+	defer file.Close()
+
+	// Leer el MBR
+	var mbr structuresP2.MBR
+	if err := utilitiesP2.ReadStruct(file, 0, &mbr); err != nil {
+		fmt.Printf("Error leyendo el MBR: %s\n", err)
+		return
+	}
+
+	if MountedPartition.Type == "Primaria" {
+		// Buscar la partición primaria en el MBR y actualizar su estado
+		for i := range mbr.MbrPartitions {
+			partName := strings.TrimRight(string(mbr.MbrPartitions[i].PartName[:]), "\x00")
+			if partName == MountedPartition.Name {
+				mbr.MbrPartitions[i].PartStatus = 0 // Marcar como no montada
+				mbr.MbrPartitions[i].PartCorrelative = 0
+				mbr.MbrPartitions[i].PartId = [4]byte{}
+				break
+			}
+		}
+	} else if MountedPartition.Type == "Lógica" {
+		// Actualizar el EBR para marcar la partición lógica como no montada
+		if err := updateLogicalPartitionStatus(file, &mbr, MountedPartition.Name, 0, ""); err != nil {
+			fmt.Printf("Error actualizando EBR: %s\n", err)
+			return
+		}
+	}
+
+	// Escribir el MBR actualizado al disco
+	if err := utilitiesP2.WriteStruct(file, 0, &mbr); err != nil {
+		fmt.Printf("Error actualizando el MBR: %s\n", err)
+		return
+	}
+
+	// Eliminar de la lista de particiones montadas
+	delete(mountManager.mountedPartitions, id)
+
+	fmt.Printf("Partición con ID '%s' desmontada exitosamente\n", id)
+
+	// Mostrar estado actual de montajes
+	showCurrentMountStatus()
+}

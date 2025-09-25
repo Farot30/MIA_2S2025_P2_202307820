@@ -225,7 +225,7 @@ func (fs *EXT2FileSystem) FormatPartition() error {
 	inodeBitmap := make([]byte, bitmapInodeSize)
 	// Marcar el primer inodo (raíz) como usado
 	if bitmapInodeSize > 0 {
-		inodeBitmap[0] = 0x80 // 10000000 - primer bit en 1
+		inodeBitmap[0] = 0x80 // 10000000 return nil- primer bit en 1
 	}
 	_, err = file.Write(inodeBitmap)
 	if err != nil {

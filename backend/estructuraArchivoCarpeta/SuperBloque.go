@@ -28,7 +28,8 @@ type SuperBloque struct {
 
 // Constantes para el sistema de archivos EXT2
 const (
-	EXT2_FILESYSTEM_TYPE = 2      // Identificador del sistema de archivos EXT2
+	EXT2_FILESYSTEM_TYPE = 2 // Identificador del sistema de archivos EXT2
+	EXT3_FILESYSTEM_TYPE = 3
 	EXT2_MAGIC           = 0xEF53 // Número mágico del sistema EXT2
 	DEFAULT_INODE_SIZE   = 128    // Tamaño por defecto del inodo
 	DEFAULT_BLOCK_SIZE   = 64     // Tamaño por defecto del bloque

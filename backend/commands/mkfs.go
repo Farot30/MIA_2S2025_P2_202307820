@@ -3,6 +3,7 @@ package commandsP2
 import (
 	bloques "MIA_2S2025_P2_202307820/Bloques"
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	structuresP2 "MIA_2S2025_P2_202307820/structures"
 	utilities "MIA_2S2025_P2_202307820/utilities"
@@ -151,6 +152,10 @@ func MKFS(args []string) {
 	// Obtener parámetros
 	id := strings.ToUpper(params["id"])
 	formatType := strings.ToUpper(params["type"])
+	fileSystem := strings.ToUpper(params["fs"])
+	if fileSystem == "" {
+		fileSystem = "2FS"
+	}
 
 	// Validar tipo de formateo (por defecto Full)
 	if formatType == "" {
@@ -170,6 +175,7 @@ func MKFS(args []string) {
 	}
 
 	fmt.Printf("Iniciando formateo %s de la partición:\n", formatType)
+	fmt.Printf(" tipo de formateo : %s\n", fileSystem)
 	fmt.Printf("  ID: %s\n", mountedPartition.ID)
 	fmt.Printf("  Disco: %s\n", mountedPartition.Path)
 	fmt.Printf("  Partición: %s\n", mountedPartition.Name)
@@ -215,11 +221,27 @@ func MKFS(args []string) {
 			return
 		}
 
+		switch fileSystem {
 		// Formatear la partición primaria
-		err = formatPartitionEXT2(file, partitionStart, partitionSize)
-		if err != nil {
-			fmt.Printf("Error formateando la partición: %s\n", err)
-			return
+		case "2fs":
+			err = formatPartitionEXT2(file, partitionStart, partitionSize)
+			if err != nil {
+				fmt.Printf("Error formateando la partición: %s\n", err)
+				return
+			}
+		case "3fs":
+			err = FormatearParticionEXT3(file, partitionStart, partitionSize)
+			if err != nil {
+				fmt.Printf("Error formateando la partición: %s\n", err)
+				return
+			}
+		default:
+			err = formatPartitionEXT2(file, partitionStart, partitionSize)
+			if err != nil {
+				fmt.Printf("Error formateando la partición: %s\n", err)
+				return
+			}
+
 		}
 
 		// Actualizar el status de la partición en el MBR (marcar como formateada)
@@ -238,10 +260,25 @@ func MKFS(args []string) {
 		}
 
 		// Formatear la partición lógica
-		err = formatPartitionEXT2(file, partitionStart, partitionSize)
-		if err != nil {
-			fmt.Printf("Error formateando la partición: %s\n", err)
-			return
+		switch fileSystem {
+		case "2fs":
+			err = formatPartitionEXT2(file, partitionStart, partitionSize)
+			if err != nil {
+				fmt.Printf("Error formateando la partición: %s\n", err)
+				return
+			}
+		case "3fs":
+			err = FormatearParticionEXT3(file, partitionStart, partitionSize)
+			if err != nil {
+				fmt.Printf("Error formateando la partición: %s\n", err)
+				return
+			}
+		default:
+			err = formatPartitionEXT2(file, partitionStart, partitionSize)
+			if err != nil {
+				fmt.Printf("Error formateando la partición: %s\n", err)
+				return
+			}
 		}
 
 		// Para particiones lógicas, el status se actualiza en el EBR
@@ -402,6 +439,27 @@ func formatPartitionEXT2(file *os.File, partitionStart, partitionSize int32) err
 	}
 
 	fmt.Println("✓ Sistema EXT2 creado exitosamente")
+	return nil
+}
+
+func FormatearParticionEXT3(file *os.File, partitionStart, partitionSize int32) error {
+	fmt.Println("\nFormateando partición con sistema EXT3...")
+
+	err := EstructuraExt3P2.FormatPartitionForFDISKEXT3(
+		file.Name(),
+		partitionSize,
+		partitionStart,
+	)
+	if err != nil {
+		return fmt.Errorf("error en formateo EXT3: %s", err)
+	}
+
+	// Verificar que el formateo fue exitoso
+	if !EstructuraExt3P2.ExisteFormatoEXT3(file.Name(), partitionStart) {
+		return fmt.Errorf("el formateo EXT3 no se completó correctamente")
+	}
+
+	fmt.Println("✓ Sistema EXT3 creado exitosamente")
 	return nil
 }
 

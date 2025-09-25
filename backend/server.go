@@ -208,13 +208,16 @@ func executeCommand(input string) {
 	allowedParams := map[string][]string{
 		"mkdisk":  {"size", "unit", "path", "fit"},
 		"rmdisk":  {"path"},
-		"fdisk":   {"type", "unit", "name", "size", "path", "fit"},
+		"fdisk":   {"type", "unit", "name", "size", "path", "fit", "delete", "add"},
 		"mount":   {"path", "name"},
+		"unmount": {"id"},
 		"mounted": {},
-		"mkfs":    {"id", "type"},
+		"mkfs":    {"id", "type", "fs"},
 		"login":   {"user", "pass", "id"},
 		"logout":  {},
 		"cat":     {"file1", "file"},
+		"edit":    {"path", "contenido"},
+		"rename":  {"path", "name"},
 		"mkgrp":   {"name"},
 		"rmgrp":   {"name"},
 		"mkusr":   {"user", "pass", "grp"},
@@ -222,6 +225,7 @@ func executeCommand(input string) {
 		"chgrp":   {"user", "grp"},
 		"mkdir":   {"path", "p"},
 		"mkfile":  {"path", "size", "cont", "r"},
+		"remove":  {"path"},
 		"rep":     {"id", "path", "name", "path_file_ls"},
 	}
 
@@ -248,6 +252,8 @@ func executeCommand(input string) {
 		commandsP2.FDISK(cmdParts[1:])
 	case "mount":
 		commandsP2.MOUNT(cmdParts[1:])
+	case "unmount":
+		commandsP2.UNMOUNT(cmdParts[1:])
 	case "mounted":
 		commandsP2.MOUNTED(cmdParts[1:])
 	case "mkfs":
@@ -274,6 +280,12 @@ func executeCommand(input string) {
 		commandsP2.MKFILE(cmdParts[1:])
 	case "rep":
 		commandsP2.REP(cmdParts[1:])
+	case "edit":
+		commandsP2.EDIT(cmdParts[1:])
+	case "rename":
+		commandsP2.RENAME(cmdParts[1:])
+	case "remove":
+		commandsP2.REMOVE(cmdParts[1:])
 	default:
 		fmt.Printf("Error: Comando '%s' no reconocido\n", cmdParts[0])
 	}

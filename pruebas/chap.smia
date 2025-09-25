@@ -1,7 +1,6 @@
 # Script de ejemplo para crear y montar un disco
 # Creado: 22/08/2025
 
-# Crear un disco de 5MB
 mkdisk -size=5 -path=disco1.smia
 
 # Formatear el disco
@@ -16,7 +15,23 @@ login -user=root -pass=123 -id=201A
 
 mkdir -path=/dir1 -p
 
-mkfile -path=/dir1/archivo1.txt -cont=/home/farot/Descargas/nes.txt
+mkfile -path=/dir1/archivo1.txt -size=40
+
+# Ver el contenido original
+cat -file1=/dir1/archivo1.txt
+
+# Editar el archivo
+edit -path=/dir1/archivo1.txt -contenido=/home/farot/Descargas/nes.txt
+
+# Verificar el contenido editado
+cat -file1=/dir1/archivo1.txt
+
+
+# Eliminar el archivo
+remove -path=/dir1/archivo1.txt
+
+# Desmontar la partición
+unmount -id=201A
 
 rep -id=201A -path=/home/farot/Calificacion_MIA/Reportes/p4_r6_file.txt" -path_file_ls=/dir1/archivo1.txt  -name=file
 
