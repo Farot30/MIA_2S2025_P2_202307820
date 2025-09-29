@@ -493,7 +493,7 @@ func createUsersFile(file *os.File, partitionStart int32) error {
 
 func createFileInEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, filename, content string) error {
 	// 1. Buscar un inodo libre
-	inodeNum, err := findFreeInode(file, ext2fs)
+	inodeNum, err := findFreeInodeEXT2(file, ext2fs)
 	if err != nil {
 		return err
 	}
@@ -560,28 +560,28 @@ func createFileInEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, file
 	return nil
 }
 
-// findFreeInode encuentra el primer inodo libre
-func findFreeInode(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem) (int32, error) {
+func findFreeInodeEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem) (int32, error) {
 	// Leer el bitmap de inodos
-	bitmapSize := (ext2fs.SuperBlock.S_inodes_count + 7) / 8
-	bitmap := make([]byte, bitmapSize)
-
-	_, err := file.Seek(int64(ext2fs.SuperBlock.S_bm_inode_start), 0)
+	inodeBitmap := make([]byte, ext2fs.SuperBlock.S_inodes_count/8)
+	_, err := file.ReadAt(inodeBitmap, int64(ext2fs.SuperBlock.S_bm_inode_start))
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("error al leer el bitmap de inodos: %v", err)
 	}
 
-	_, err = file.Read(bitmap)
-	if err != nil {
-		return -1, err
-	}
+	// Comenzar la búsqueda desde el inodo 1 para preservar el inodo raíz (0)
+	// El inodo 0 está reservado para el directorio raíz y nunca debe ser reasignado
 
-	// Buscar el primer bit en 0 (libre)
+	// Buscar el primer inodo libre (comenzando desde 1 para proteger el inodo raíz)
 	for i := int32(1); i < ext2fs.SuperBlock.S_inodes_count; i++ {
 		byteIndex := i / 8
 		bitIndex := i % 8
-
-		if (bitmap[byteIndex] & (1 << (7 - bitIndex))) == 0 {
+		if (inodeBitmap[byteIndex] & (1 << bitIndex)) == 0 {
+			// Marcar el inodo como usado
+			inodeBitmap[byteIndex] |= (1 << bitIndex)
+			_, err := file.WriteAt(inodeBitmap, int64(ext2fs.SuperBlock.S_bm_inode_start))
+			if err != nil {
+				return -1, fmt.Errorf("error al actualizar el bitmap de inodos: %v", err)
+			}
 			return i, nil
 		}
 	}

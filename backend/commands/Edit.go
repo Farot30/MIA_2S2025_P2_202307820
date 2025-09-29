@@ -685,13 +685,13 @@ func updateFileContentEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem,
 	// Asignar nuevos bloques directos
 	for i := 0; i < 12 && i < int(blockCount); i++ {
 		// Buscar un bloque libre
-		newBlockNum := findFreeBlockEXT2(file, ext2fs)
-		if newBlockNum == -1 {
-			return fmt.Errorf("no hay bloques libres disponibles")
+		newBlockNum, err := EstructuraExt2.FindFreeBlockEXT2(file, ext2fs)
+		if err != nil {
+			return fmt.Errorf("no hay bloques libres disponibles: %v", err)
 		}
 
 		// Marcar el bloque como usado en el bitmap
-		err := markBlockAsUsedEXT2(file, ext2fs, newBlockNum)
+		err = markBlockAsUsedEXT2(file, ext2fs, newBlockNum)
 		if err != nil {
 			return fmt.Errorf("error al marcar bloque como usado: %v", err)
 		}
@@ -776,13 +776,13 @@ func updateFileContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyste
 	// Asignar nuevos bloques directos
 	for i := 0; i < 12 && i < int(blockCount); i++ {
 		// Buscar un bloque libre
-		newBlockNum := findFreeBlockEXT3(file, ext3fs)
-		if newBlockNum == -1 {
-			return fmt.Errorf("no hay bloques libres disponibles")
+		newBlockNum, err := findFreeBlockEXT3(file, ext3fs)
+		if err != nil {
+			return fmt.Errorf("no hay bloques libres disponibles: %v", err)
 		}
 
 		// Marcar el bloque como usado en el bitmap
-		err := markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
+		err = markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
 		if err != nil {
 			return fmt.Errorf("error al marcar bloque como usado: %v", err)
 		}
@@ -825,50 +825,8 @@ func updateFileContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyste
 	return utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+fileInodeNum*ext3fs.SuperBlock.S_inode_s), fileInode)
 }
 
-// findFreeBlockEXT2 busca un bloque libre en el sistema EXT2
-func findFreeBlockEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem) int32 {
-	// Si hay un bloque libre conocido, usarlo
-	if ext2fs.SuperBlock.S_first_blo != -1 {
-		freeBlock := ext2fs.SuperBlock.S_first_blo
-
-		// Buscar el siguiente bloque libre para actualizar S_first_blo
-		found := false
-		for i := freeBlock + 1; i < ext2fs.SuperBlock.S_blocks_count && !found; i++ {
-			bytePos := i / 8
-			bitPos := i % 8
-
-			bitmap, err := utilitiesP2.ReadBytes(file, int64(ext2fs.SuperBlock.S_bm_block_start+bytePos), 1)
-			if err == nil && (bitmap[0]&(1<<uint(bitPos))) == 0 {
-				ext2fs.SuperBlock.S_first_blo = i
-				found = true
-			}
-		}
-
-		// Si no hay más bloques libres
-		if !found {
-			ext2fs.SuperBlock.S_first_blo = -1
-		}
-
-		return freeBlock
-	}
-
-	// Buscar un bloque libre en el bitmap
-	for i := int32(0); i < ext2fs.SuperBlock.S_blocks_count; i++ {
-		bytePos := i / 8
-		bitPos := i % 8
-
-		bitmap, err := utilitiesP2.ReadBytes(file, int64(ext2fs.SuperBlock.S_bm_block_start+bytePos), 1)
-		if err == nil && (bitmap[0]&(1<<uint(bitPos))) == 0 {
-			// Encontrado un bloque libre
-			return i
-		}
-	}
-
-	return -1 // No hay bloques libres
-}
-
 // findFreeBlockEXT3 busca un bloque libre en el sistema EXT3
-func findFreeBlockEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) int32 {
+func findFreeBlockEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) (int32, error) {
 	// Si hay un bloque libre conocido, usarlo
 	if ext3fs.SuperBlock.S_first_blo != -1 {
 		freeBlock := ext3fs.SuperBlock.S_first_blo
@@ -891,7 +849,7 @@ func findFreeBlockEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) i
 			ext3fs.SuperBlock.S_first_blo = -1
 		}
 
-		return freeBlock
+		return freeBlock, nil
 	}
 
 	// Buscar un bloque libre en el bitmap
@@ -902,11 +860,11 @@ func findFreeBlockEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) i
 		bitmap, err := utilitiesP2.ReadBytes(file, int64(ext3fs.SuperBlock.S_bm_block_start+bytePos), 1)
 		if err == nil && (bitmap[0]&(1<<uint(bitPos))) == 0 {
 			// Encontrado un bloque libre
-			return i
+			return i, nil
 		}
 	}
 
-	return -1 // No hay bloques libres
+	return -1, fmt.Errorf("no hay bloques libres disponibles")
 }
 
 // markBlockAsUsedEXT2 marca un bloque como usado en el bitmap de EXT2

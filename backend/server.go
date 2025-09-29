@@ -218,6 +218,7 @@ func executeCommand(input string) {
 		"cat":     {"file1", "file"},
 		"edit":    {"path", "contenido"},
 		"rename":  {"path", "name"},
+		"copy":    {"path", "destino"},
 		"mkgrp":   {"name"},
 		"rmgrp":   {"name"},
 		"mkusr":   {"user", "pass", "grp"},
@@ -284,6 +285,8 @@ func executeCommand(input string) {
 		commandsP2.EDIT(cmdParts[1:])
 	case "rename":
 		commandsP2.RENAME(cmdParts[1:])
+	case "copy":
+		commandsP2.COPY(cmdParts[1:])
 	case "remove":
 		commandsP2.REMOVE(cmdParts[1:])
 	default:

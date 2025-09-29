@@ -262,7 +262,7 @@ func findOrCreateDirectory(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem,
 
 func createFileInEXT2System(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, parentInodeNum int32, fileName string, content []byte, size int32, sessionInfo *session.UserSession, partition MountedPartition) error {
 	// Buscar un inodo libre
-	fileInodeNum, err := findFreeInode(file, ext2fs)
+	fileInodeNum, err := findFreeInodeEXT2(file, ext2fs)
 	if err != nil {
 		return fmt.Errorf("no hay inodos libres: %s", err)
 	}
@@ -1388,7 +1388,7 @@ func deleteFileFromDirectory(file *os.File, ext2fs *EstructuraExt2.EXT2FileSyste
 // createDirectoryInEXT2 crea un nuevo directorio en el sistema EXT2
 func createDirectoryInEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, parentInodeNum int32, dirName string, sessionInfo *session.UserSession) (int32, error) {
 	// Buscar un inodo libre
-	newInodeNum, err := findFreeInode(file, ext2fs)
+	newInodeNum, err := findFreeInodeEXT2(file, ext2fs)
 	if err != nil {
 		return -1, fmt.Errorf("no hay inodos libres: %s", err)
 	}

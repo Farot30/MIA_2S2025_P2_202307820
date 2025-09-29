@@ -592,3 +592,27 @@ func (fs *EXT3FileSystem) LeerArchivo(filePath string) (string, error) {
 	return fileContent.String(), nil
 
 }
+
+func FindFreeInodeEXT3(file *os.File, ext3fs *EXT3FileSystem) (int32, error) {
+
+	inodeBitmap := make([]byte, ext3fs.SuperBlock.S_inodes_count/8)
+	_, err := file.ReadAt(inodeBitmap, int64(ext3fs.SuperBlock.S_bm_inode_start))
+	if err != nil {
+		return -1, fmt.Errorf("error al leer el bitmap de inodos: %v", err)
+	}
+
+	for i := int32(1); i < ext3fs.SuperBlock.S_inodes_count; i++ {
+		byteIndex := i / 8
+		bitIndex := i % 8
+		if (inodeBitmap[byteIndex] & (1 << bitIndex)) == 0 {
+			inodeBitmap[byteIndex] |= (1 << bitIndex)
+			_, err := file.WriteAt(inodeBitmap, int64(ext3fs.SuperBlock.S_bm_inode_start))
+			if err != nil {
+				return -1, fmt.Errorf("error al actualizar el bitmap de inodos: %v", err)
+			}
+			return i, nil
+		}
+	}
+
+	return -1, fmt.Errorf("no hay inodos libres disponibles")
+}

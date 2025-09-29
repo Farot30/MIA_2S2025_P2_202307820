@@ -220,7 +220,7 @@ func createDirectoryInEXT2System(file *os.File, ext2fs *EstructuraExt2.EXT2FileS
 // createDirectoryInEXT2Basic crea un directorio básico sin actualizar superbloque (para uso interno)
 func createDirectoryInEXT2Basic(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, parentInodeNum int32, dirName string, sessionInfo *session.UserSession) (int32, error) {
 	// Buscar un inodo libre
-	newInodeNum, err := findFreeInode(file, ext2fs)
+	newInodeNum, err := findFreeInodeEXT2(file, ext2fs)
 	if err != nil {
 		return -1, fmt.Errorf("no hay inodos libres: %s", err)
 	}
