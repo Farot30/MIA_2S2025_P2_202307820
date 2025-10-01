@@ -214,6 +214,10 @@ func executeCommand(input string) {
 		"mounted": {},
 		"mkfs":    {"id", "type", "fs"},
 		"login":   {"user", "pass", "id"},
+		"move":    {"path", "destino"},
+		"find":    {"path", "name"},
+		"chown":   {"path", "usuario", "r"},
+		"chmod":   {"path", "ugo", "r"},
 		"logout":  {},
 		"cat":     {"file1", "file"},
 		"edit":    {"path", "contenido"},
@@ -289,6 +293,14 @@ func executeCommand(input string) {
 		commandsP2.COPY(cmdParts[1:])
 	case "remove":
 		commandsP2.REMOVE(cmdParts[1:])
+	case "move":
+		commandsP2.MOVE(cmdParts[1:])
+	case "find":
+		commandsP2.FIND(cmdParts[1:])
+	case "chown":
+		commandsP2.CHOWN(cmdParts[1:])
+	case "chmod":
+		commandsP2.CHMOD(cmdParts[1:])
 	default:
 		fmt.Printf("Error: Comando '%s' no reconocido\n", cmdParts[0])
 	}

@@ -1,0 +1,38 @@
+mkdisk -size=5 -path=disco1.mia
+mkdisk -size=6 -path=disco2.mia
+
+# Formatear el disco
+fdisk -size=3 -path=disco1.mia -name=Part1 -unit=M
+
+# Montar la partición
+mount -path=disco1.mia -name=Part1
+
+mkfs -id=201A -type=full
+
+login -user=root -pass=123 -id=201A
+
+mkdir -path=/dir1 -p
+
+mkdir -path=/home/usuarios/macos -p
+
+mkdir -path=/dir1/destinos
+
+mkfile -path=/home/usuarios/macos/archivo1.txt -size=40
+
+
+
+cat -file1=/home/usuarios/macos/archivo1.txt
+
+copy -path=/home/usuarios -destino=/dir1/destinos
+
+
+
+#siguiente comadno cat
+
+cat -file1=/dir1/destinos/usuarios/macos/archivo1.txt
+
+#comando moviendo el bote
+
+move -path=/dir1/destinos/usuarios/macos/archivo1.txt -destino=/home/usuarios
+
+cat -file1=/home/usuarios/archivo1.txt
