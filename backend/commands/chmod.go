@@ -185,7 +185,7 @@ func chmodInEXT3(partition MountedPartition, targetPath string, permissions [3]b
 	}
 
 	// Registrar éxito en journal
-	err = ext3fs.AddJournalEntry("chmod_success", targetPath, permissionsStr)
+	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_CHMOD, targetPath, permissionsStr)
 	if err != nil {
 		fmt.Printf("WARNING: No se pudo registrar éxito en journal: %v\n", err)
 	}

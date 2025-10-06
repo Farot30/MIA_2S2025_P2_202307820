@@ -27,13 +27,25 @@ const (
 	OPERATION_MKFILE   = "mkfile"   // Crear archivo
 	OPERATION_RMDIR    = "rmdir"    // Eliminar directorio
 	OPERATION_RMFILE   = "rmfile"   // Eliminar archivo
+	OPERATION_RMGRP    = "rmgrp"    // Eliminar grupo
+	OPERATION_RMUSR    = "rmusr"    // Eliminar usuario
 	OPERATION_EDIT     = "edit"     // Editar archivo
 	OPERATION_RENAME   = "rename"   // Renombrar archivo o directorio
 	OPERATION_CHMOD    = "chmod"    // Cambiar permisos
 	OPERATION_CHOWN    = "chown"    // Cambiar propietario
 	OPERATION_CHGRP    = "chgrp"    // Cambiar grupo
+	OPERATION_MKGRP    = "mkgrp"    // Crear grupo
+	OPERATION_MKUSR    = "mkusr"    // Crear usuario
+	OPERATION_LOGIN    = "login"    // Inicio de sesión
+	OPERATION_LOGOUT   = "logout"   // Cierre de sesión
 	OPERATION_RECOVERY = "recovery" // Recuperación del sistema
 	OPERATION_FORMAT   = "format"   // Formateo del sistema
+	OPERATION_READ     = "read"     // Lectura de archivo
+	OPERATION_FIND     = "find"     // Búsqueda de archivo
+	OPERATION_COPY     = "copy"     // Copiar archivo
+	OPERATION_MOVE     = "move"     // Mover archivo
+	OPERATION_MOUNT    = "mount"    // Montar partición
+	OPERATION_UNMOUNT  = "unmount"  // Desmontar partición
 )
 
 // GetJournalSize retorna el tamaño en bytes de un Journal

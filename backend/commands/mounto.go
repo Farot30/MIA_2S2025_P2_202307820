@@ -2,6 +2,7 @@ package commandsP2
 
 import (
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	structuresP2 "MIA_2S2025_P2_202307820/structures"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
@@ -225,6 +226,17 @@ func mountPrimaryPartition(diskPath, partitionName string, partitionIndex int, p
 	// Agregar a la lista de particiones montadas
 	mountManager.mountedPartitions[mountID] = mountedPartition
 
+	fsType, err := detectFileSystemType(mountedPartition)
+	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
+		ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
+		if err == nil {
+			err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición montada: %s", partitionName))
+			if err != nil {
+				fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
+			}
+		}
+	}
+
 	// INFORMACIÓN DETALLADA DEL MONTAJE
 	fmt.Printf("\n=== PARTICIÓN PRIMARIA MONTADA ===\n")
 	fmt.Printf("ID generado: %s\n", mountID)
@@ -302,6 +314,17 @@ func mountLogicalPartition(diskPath, partitionName string, partitionStart int32,
 
 	// Agregar a la lista de particiones montadas
 	mountManager.mountedPartitions[mountID] = mountedPartition
+
+	fsType, err := detectFileSystemType(mountedPartition)
+	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
+		ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
+		if err == nil {
+			err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición lógica montada: %s", partitionName))
+			if err != nil {
+				fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
+			}
+		}
+	}
 
 	fmt.Printf("\n=== PARTICIÓN LÓGICA MONTADA ===\n")
 	fmt.Printf("ID generado: %s\n", mountID)
@@ -511,6 +534,17 @@ func UNMOUNT(args []string) {
 	if err := utilitiesP2.WriteStruct(file, 0, &mbr); err != nil {
 		fmt.Printf("Error actualizando el MBR: %s\n", err)
 		return
+	}
+
+	fsType, err := detectFileSystemType(MountedPartition)
+	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
+		ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(MountedPartition.Path, MountedPartition.Start)
+		if err == nil {
+			err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_UNMOUNT, "/", fmt.Sprintf("Partición desmontada: %s", MountedPartition.Name))
+			if err != nil {
+				fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
+			}
+		}
 	}
 
 	// Eliminar de la lista de particiones montadas

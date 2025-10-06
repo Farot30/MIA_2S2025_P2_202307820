@@ -3,6 +3,7 @@ package commandsP2
 import (
 	bloques "MIA_2S2025_P2_202307820/Bloques"
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	session "MIA_2S2025_P2_202307820/Session"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
@@ -111,7 +112,6 @@ func MKUSR(args []string) {
 	fmt.Printf("Usuario '%s' creado exitosamente en el grupo '%s'\n", username, groupName)
 }
 
-// createUser crea un usuario en el archivo users.txt
 func createUser(partition MountedPartition, username, password, groupName string) error {
 	// Abrir el archivo del disco
 	file, err := os.OpenFile(partition.Path, os.O_RDWR, 0666)
@@ -120,62 +120,65 @@ func createUser(partition MountedPartition, username, password, groupName string
 	}
 	defer file.Close()
 
-	// Leer el sistema EXT2 de la partición
-	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(partition.Path, getPartitionStartOffset(partition))
+	fsType, err := detectFileSystemType(partition)
 	if err != nil {
-		return fmt.Errorf("error leyendo sistema EXT2: %s", err)
+		return fmt.Errorf("error detectando sistema de archivos: %s", err)
 	}
 
-	// Verificar que el sistema esté formateado
-	if ext2fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
-		return fmt.Errorf("la partición no tiene formato EXT2 válido")
+	if fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
+		return createUserExt3(file, partition, username, password, groupName)
+	} else {
+		return createUserExt2(file, partition, username, password, groupName)
+	}
+}
+
+func createUserExt3(file *os.File, partition MountedPartition, username, password, groupName string) error {
+
+	ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(partition.Path, getPartitionStartOffset(partition))
+	if err != nil {
+		return fmt.Errorf("error leyendo sistema EXT3: %s", err)
 	}
 
-	// Buscar el archivo users.txt en el directorio raíz
-	usersInodeNum, err := findFileInRootDirectory(file, ext2fs, "users.txt")
+	if ext3fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return fmt.Errorf("la partición no tiene formato EXT3 válido")
+	}
+
+	usersInodeNum, err := findFileInRootDirectoryEXT3(file, ext3fs, "users.txt")
 	if err != nil {
 		return fmt.Errorf("archivo users.txt no encontrado: %s", err)
 	}
 
-	// Leer el inodo del archivo users.txt
 	usersInode := &estructuraArchivoCarpeta.Inodo{}
-	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (usersInodeNum * ext2fs.SuperBlock.S_inode_s))
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (usersInodeNum * ext3fs.SuperBlock.S_inode_s))
 	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
 	if err != nil {
 		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
 	}
 
-	// Leer el contenido actual del archivo users.txt
-	currentContent, err := readFileContentFromBlocks(file, ext2fs, usersInode)
+	currentContent, err := readFileContentFromBlocksEXT3(file, ext3fs, usersInode)
 	if err != nil {
 		return fmt.Errorf("error leyendo contenido de users.txt: %s", err)
 	}
 
-	// Verificar que el usuario no existe ya
 	if userExists(currentContent, username) {
 		return fmt.Errorf("el usuario '%s' ya existe", username)
 	}
 
-	// Verificar que el grupo existe
 	if !groupExistsAndActive(currentContent, groupName) {
+		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKUSR, "/", fmt.Sprintf("Error: El grupo '%s' no existe", groupName))
 		return fmt.Errorf("el grupo '%s' no existe", groupName)
 	}
 
-	// Obtener el siguiente ID de usuario disponible
 	nextUID := getNextUserID(currentContent)
 
-	// Crear la entrada del nuevo usuario
-	// Formato: ID,U,username,groupname,password
 	userEntry := fmt.Sprintf("%d,U,%s,%s,%s", nextUID, groupName, username, password)
 
-	// Agregar la nueva línea al contenido
 	newContent := currentContent
 	if !strings.HasSuffix(newContent, "\n") && newContent != "" {
 		newContent += "\n"
 	}
 	newContent += userEntry + "\n"
 
-	// MOSTRAR INFORMACIÓN ANTES DE ESCRIBIR
 	fmt.Printf("\nPREPARANDO CREACIÓN DE USUARIO:\n")
 	fmt.Printf("Usuario: %s\n", username)
 	fmt.Printf("Contraseña: %s\n", password)
@@ -183,15 +186,88 @@ func createUser(partition MountedPartition, username, password, groupName string
 	fmt.Printf("ID asignado: %d\n", nextUID)
 	fmt.Printf("Entrada: %s\n", userEntry)
 
-	// VERIFICAR ESPACIO ANTES DE ESCRIBIR
 	newContentSize := int32(len([]byte(newContent)))
 	fmt.Printf("Tamaño actual: %d bytes → Nuevo tamaño: %d bytes\n",
 		int32(len([]byte(currentContent))), newContentSize)
 
-	// MOSTRAR INFORMACIÓN DEL ESPACIO DISPONIBLE
 	showFileSpaceInfo(usersInode, newContentSize)
 
-	// Escribir el contenido actualizado de vuelta al archivo
+	err = writeContentToFileEXT3(file, ext3fs, usersInode, newContent, usersInodeNum)
+	if err != nil {
+		fmt.Printf("\nERROR EN LA CREACIÓN DEL USUARIO:\n")
+		fmt.Printf("Usuario que se intentó crear: %s\n", username)
+		fmt.Printf("Motivo: %s\n", err)
+		fmt.Printf("Sugerencia: El archivo users.txt necesita más bloques\n")
+		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
+	}
+
+	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKUSR, "/", fmt.Sprintf("Creación de usuario '%s'", username))
+	if err != nil {
+		return fmt.Errorf("error registrando en el journal: %s", err)
+	}
+
+	return nil
+}
+
+func createUserExt2(file *os.File, partition MountedPartition, username, password, groupName string) error {
+
+	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(partition.Path, getPartitionStartOffset(partition))
+	if err != nil {
+		return fmt.Errorf("error leyendo sistema EXT2: %s", err)
+	}
+
+	if ext2fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return fmt.Errorf("la partición no tiene formato EXT2 válido")
+	}
+
+	usersInodeNum, err := findFileInRootDirectory(file, ext2fs, "users.txt")
+	if err != nil {
+		return fmt.Errorf("archivo users.txt no encontrado: %s", err)
+	}
+
+	usersInode := &estructuraArchivoCarpeta.Inodo{}
+	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (usersInodeNum * ext2fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
+	if err != nil {
+		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
+	}
+
+	currentContent, err := readFileContentFromBlocks(file, ext2fs, usersInode)
+	if err != nil {
+		return fmt.Errorf("error leyendo contenido de users.txt: %s", err)
+	}
+
+	if userExists(currentContent, username) {
+		return fmt.Errorf("el usuario '%s' ya existe", username)
+	}
+
+	if !groupExistsAndActive(currentContent, groupName) {
+		return fmt.Errorf("el grupo '%s' no existe", groupName)
+	}
+
+	nextUID := getNextUserID(currentContent)
+
+	userEntry := fmt.Sprintf("%d,U,%s,%s,%s", nextUID, groupName, username, password)
+
+	newContent := currentContent
+	if !strings.HasSuffix(newContent, "\n") && newContent != "" {
+		newContent += "\n"
+	}
+	newContent += userEntry + "\n"
+
+	fmt.Printf("\nPREPARANDO CREACIÓN DE USUARIO:\n")
+	fmt.Printf("Usuario: %s\n", username)
+	fmt.Printf("Contraseña: %s\n", password)
+	fmt.Printf("Grupo: %s\n", groupName)
+	fmt.Printf("ID asignado: %d\n", nextUID)
+	fmt.Printf("Entrada: %s\n", userEntry)
+
+	newContentSize := int32(len([]byte(newContent)))
+	fmt.Printf("Tamaño actual: %d bytes → Nuevo tamaño: %d bytes\n",
+		int32(len([]byte(currentContent))), newContentSize)
+
+	showFileSpaceInfo(usersInode, newContentSize)
+
 	err = writeContentToFileUser(file, ext2fs, usersInode, newContent, usersInodeNum)
 	if err != nil {
 		fmt.Printf("\nERROR EN LA CREACIÓN DEL USUARIO:\n")

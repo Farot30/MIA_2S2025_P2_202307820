@@ -248,7 +248,151 @@ func findAvailableSpace(mbr *structuresP2.MBR, size int32, fit byte) (int32, err
 	}
 
 	// Retornar posición donde empezará la partición
+
 	return int32(unsafe.Sizeof(structuresP2.MBR{})) + used, nil
+}
+
+// findAvailableSpace busca espacio disponible según el algoritmo de ajuste
+func findAvailableSpace1(mbr *structuresP2.MBR, size int32, fit byte) (int32, error) {
+	mbrSize := int32(unsafe.Sizeof(structuresP2.MBR{}))
+	diskSize := mbr.MbrTamano
+
+	// Crear lista de espacios ocupados (incluyendo el MBR)
+	var occupiedSpaces []struct {
+		Start int32
+		End   int32
+	}
+
+	// Agregar el MBR como espacio ocupado
+	occupiedSpaces = append(occupiedSpaces, struct {
+		Start int32
+		End   int32
+	}{Start: 0, End: mbrSize})
+
+	// Agregar todas las particiones existentes
+	for _, partition := range mbr.MbrPartitions {
+		if partition.PartS > 0 {
+			occupiedSpaces = append(occupiedSpaces, struct {
+				Start int32
+				End   int32
+			}{
+				Start: partition.PartStart,
+				End:   partition.PartStart + partition.PartS,
+			})
+		}
+	}
+
+	// Ordenar espacios ocupados por posición de inicio
+	for i := 0; i < len(occupiedSpaces); i++ {
+		for j := i + 1; j < len(occupiedSpaces); j++ {
+			if occupiedSpaces[i].Start > occupiedSpaces[j].Start {
+				occupiedSpaces[i], occupiedSpaces[j] = occupiedSpaces[j], occupiedSpaces[i]
+			}
+		}
+	}
+
+	// Buscar espacios libres
+	var freeSpaces []struct {
+		Start int32
+		Size  int32
+	}
+
+	// Verificar espacio antes de la primera partición (después del MBR)
+	if len(occupiedSpaces) > 1 {
+		firstPartitionStart := occupiedSpaces[1].Start
+		if firstPartitionStart > mbrSize {
+			gapSize := firstPartitionStart - mbrSize
+			if gapSize >= size {
+				freeSpaces = append(freeSpaces, struct {
+					Start int32
+					Size  int32
+				}{Start: mbrSize, Size: gapSize})
+			}
+		}
+	}
+
+	// Verificar espacios entre particiones
+	for i := 1; i < len(occupiedSpaces)-1; i++ {
+		currentEnd := occupiedSpaces[i].End
+		nextStart := occupiedSpaces[i+1].Start
+
+		if nextStart > currentEnd {
+			gapSize := nextStart - currentEnd
+			if gapSize >= size {
+				freeSpaces = append(freeSpaces, struct {
+					Start int32
+					Size  int32
+				}{Start: currentEnd, Size: gapSize})
+			}
+		}
+	}
+
+	// Verificar espacio al final del disco
+	if len(occupiedSpaces) > 0 {
+		lastEnd := occupiedSpaces[len(occupiedSpaces)-1].End
+		if diskSize > lastEnd {
+			gapSize := diskSize - lastEnd
+			if gapSize >= size {
+				freeSpaces = append(freeSpaces, struct {
+					Start int32
+					Size  int32
+				}{Start: lastEnd, Size: gapSize})
+			}
+		}
+	} else {
+		// No hay particiones, todo el espacio después del MBR está libre
+		gapSize := diskSize - mbrSize
+		if gapSize >= size {
+			freeSpaces = append(freeSpaces, struct {
+				Start int32
+				Size  int32
+			}{Start: mbrSize, Size: gapSize})
+		}
+	}
+
+	// Si no hay espacios libres suficientes
+	if len(freeSpaces) == 0 {
+		totalUsed := int32(0)
+		for _, partition := range mbr.MbrPartitions {
+			if partition.PartS > 0 {
+				totalUsed += partition.PartS
+			}
+		}
+		available := diskSize - totalUsed - mbrSize
+		return 0, fmt.Errorf("no hay suficiente espacio disponible. Requerido: %d bytes, Disponible: %d bytes", size, available)
+	}
+
+	// Aplicar algoritmo de ajuste
+	switch fit {
+	case 'F': // First Fit
+		return freeSpaces[0].Start, nil
+
+	case 'B': // Best Fit
+		bestIndex := 0
+		bestSize := freeSpaces[0].Size
+		for i := 1; i < len(freeSpaces); i++ {
+			if freeSpaces[i].Size < bestSize {
+				bestSize = freeSpaces[i].Size
+				bestIndex = i
+			}
+		}
+		return freeSpaces[bestIndex].Start, nil
+
+	case 'W': // Worst Fit
+		worstIndex := 0
+		worstSize := freeSpaces[0].Size
+		for i := 1; i < len(freeSpaces); i++ {
+			if freeSpaces[i].Size > worstSize {
+				worstSize = freeSpaces[i].Size
+				worstIndex = i
+			}
+		}
+		return freeSpaces[worstIndex].Start, nil
+
+	default:
+		// Por defecto usar First Fit
+		return freeSpaces[0].Start, nil
+	}
 }
 
 // Funciones auxiliares para crear cada tipo de partición

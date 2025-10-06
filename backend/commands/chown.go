@@ -3,6 +3,7 @@ package commandsP2
 import (
 	BloquesP2 "MIA_2S2025_P2_202307820/Bloques"
 	EstructuraExt2P2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	sessionP2 "MIA_2S2025_P2_202307820/Session"
 	EstructuraarchivocarpetaP2 "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
@@ -58,8 +59,20 @@ func CHOWN(args []string) {
 		return
 	}
 
-	// Ejecutar el cambio de propietario
-	err := chownInEXT2(mountedPartition, targetPath, newOwner, recursive, sessionInfo)
+	fileSystemType, err := getFileSystemType(mountedPartition)
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return
+	}
+
+	if fileSystemType == EstructuraarchivocarpetaP2.EXT2_FILESYSTEM_TYPE {
+		err = chownInEXT2(mountedPartition, targetPath, newOwner, recursive, sessionInfo)
+	} else if fileSystemType == EstructuraarchivocarpetaP2.EXT3_FILESYSTEM_TYPE {
+		err = chownInEXT3(mountedPartition, targetPath, newOwner, recursive, sessionInfo)
+	} else {
+		fmt.Printf("ERROR: Tipo de sistema de archivos no soportado.\n")
+	}
+
 	if err != nil {
 		fmt.Printf("ERROR: %v\n", err)
 		return
@@ -137,6 +150,72 @@ func chownInEXT2(partition MountedPartition, targetPath, newOwner string, recurs
 	}
 }
 
+func chownInEXT3(partition MountedPartition, targetPath, newOwner string, recursive bool, sessionInfo *sessionP2.UserSession) error {
+
+	file, err := os.OpenFile(partition.Path, os.O_RDWR, 0666)
+	if err != nil {
+		return fmt.Errorf("no se pudo abrir la partición: %v", err)
+	}
+	defer file.Close()
+
+	ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(partition.Path, partition.Start)
+	if err != nil {
+		return fmt.Errorf("no se pudo leer el sistema EXT3: %v", err)
+	}
+
+	newOwnerUID, err := getUserUID(partition, newOwner)
+	if err != nil {
+		return fmt.Errorf("el usuario '%s' no existe: %v", newOwner, err)
+	}
+
+	targetDir := filepath.Dir(targetPath)
+	targetName := filepath.Base(targetPath)
+
+	parentInodeNum, err := findDirectoryInEXT3ForChown(file, ext3fs, targetDir)
+	if err != nil {
+		return fmt.Errorf("no se pudo encontrar el directorio '%s': %v", targetDir, err)
+	}
+
+	parentInode := &EstructuraarchivocarpetaP2.Inodo{}
+	err = utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+parentInodeNum*ext3fs.SuperBlock.S_inode_s), parentInode)
+	if err != nil {
+		return fmt.Errorf("no se pudo leer inodo del directorio padre: %v", err)
+	}
+
+	targetInodeNum, err := findFileInDirectoryEXT3ForChown(file, ext3fs, parentInode, targetName)
+	if err != nil || targetInodeNum == -1 {
+		return fmt.Errorf("no se pudo encontrar '%s' en '%s'", targetName, targetDir)
+	}
+
+	targetInode := &EstructuraarchivocarpetaP2.Inodo{}
+	err = utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+targetInodeNum*ext3fs.SuperBlock.S_inode_s), targetInode)
+	if err != nil {
+		return fmt.Errorf("no se pudo leer inodo del elemento objetivo: %v", err)
+	}
+
+	err = checkChownPermissions(targetInode, sessionInfo)
+	if err != nil {
+		return err
+	}
+
+	if recursive && targetInode.Itype == 0 {
+		err = chownRecursiveEXT3(file, ext3fs, targetInode, targetInodeNum, newOwnerUID, sessionInfo)
+	} else {
+		err = chownSingleEXT3(file, ext3fs, targetInode, targetInodeNum, newOwnerUID)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Registrar la operación en el journal
+	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_CHOWN, targetPath, fmt.Sprintf("Nuevo propietario: %s", newOwner))
+	if err != nil {
+		fmt.Printf("Advertencia: No se pudo registrar la operación en el journal: %v\n", err)
+	}
+
+	return nil
+}
+
 // checkChownPermissions verifica si el usuario actual puede cambiar el propietario
 func checkChownPermissions(targetInode *EstructuraarchivocarpetaP2.Inodo, sessionInfo *sessionP2.UserSession) error {
 	// Root puede cambiar cualquier propietario
@@ -160,6 +239,20 @@ func chownSingle(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem, targetI
 
 	// Escribir el inodo actualizado
 	err := utilitiesP2.WriteStruct(file, int64(ext2fs.SuperBlock.S_inode_start+targetInodeNum*ext2fs.SuperBlock.S_inode_s), targetInode)
+	if err != nil {
+		return fmt.Errorf("error escribiendo inodo actualizado: %v", err)
+	}
+
+	return nil
+}
+
+func chownSingleEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, targetInode *EstructuraarchivocarpetaP2.Inodo, targetInodeNum, newOwnerUID int32) error {
+	// Cambiar el UID del inodo
+	targetInode.Iuid = newOwnerUID
+	targetInode.Imtime = EstructuraarchivocarpetaP2.GetCurrentTimestamp() // Actualizar tiempo de modificación
+
+	// Escribir el inodo actualizado
+	err := utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+targetInodeNum*ext3fs.SuperBlock.S_inode_s), targetInode)
 	if err != nil {
 		return fmt.Errorf("error escribiendo inodo actualizado: %v", err)
 	}
@@ -220,6 +313,69 @@ func chownRecursive(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem, dirI
 				} else { // Es archivo
 					// Cambiar propietario del archivo
 					err = chownSingle(file, ext2fs, entryInode, entryInodeNum, newOwnerUID)
+					if err != nil {
+						fmt.Printf("[WARNING] Error cambiando propietario de '%s': %v\n", entryName, err)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func chownRecursiveEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, dirInode *EstructuraarchivocarpetaP2.Inodo, dirInodeNum, newOwnerUID int32, sessionInfo *sessionP2.UserSession) error {
+	// Cambiar propietario del directorio actual
+	err := chownSingleEXT3(file, ext3fs, dirInode, dirInodeNum, newOwnerUID)
+	if err != nil {
+		return fmt.Errorf("error cambiando propietario del directorio: %v", err)
+	}
+
+	// Procesar todas las entradas del directorio
+	for i := 0; i < 12 && dirInode.Iblock[i] != -1; i++ {
+		blockNum := dirInode.Iblock[i]
+		block := &BloquesP2.BloqueCarpeta{}
+
+		err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_block_start+blockNum*ext3fs.SuperBlock.S_block_s), block)
+		if err != nil {
+			fmt.Printf("[WARNING] No se pudo leer bloque %d: %v\n", blockNum, err)
+			continue
+		}
+
+		// Procesar cada entrada del bloque
+		for j := 0; j < 4; j++ {
+			if !block.IsEntryEmpty(j) {
+				entryName, entryInodeNum, _ := block.GetEntry(j)
+
+				// Saltar entradas . y ..
+				if entryName == "." || entryName == ".." {
+					continue
+				}
+
+				// Leer el inodo de la entrada
+				entryInode := &EstructuraarchivocarpetaP2.Inodo{}
+				err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+entryInodeNum*ext3fs.SuperBlock.S_inode_s), entryInode)
+				if err != nil {
+					fmt.Printf("[WARNING] No se pudo leer inodo de '%s': %v\n", entryName, err)
+					continue
+				}
+
+				// Verificar permisos antes de cambiar
+				err = checkChownPermissions(entryInode, sessionInfo)
+				if err != nil {
+					fmt.Printf("[WARNING] Sin permisos para cambiar '%s': %v\n", entryName, err)
+					continue
+				}
+
+				if entryInode.Itype == 0 { // Es directorio
+					// Cambiar recursivamente
+					err = chownRecursiveEXT3(file, ext3fs, entryInode, entryInodeNum, newOwnerUID, sessionInfo)
+					if err != nil {
+						fmt.Printf("[WARNING] Error en subdirectorio '%s': %v\n", entryName, err)
+					}
+				} else { // Es archivo
+					// Cambiar propietario del archivo
+					err = chownSingleEXT3(file, ext3fs, entryInode, entryInodeNum, newOwnerUID)
 					if err != nil {
 						fmt.Printf("[WARNING] Error cambiando propietario de '%s': %v\n", entryName, err)
 					}
@@ -378,6 +534,45 @@ func findDirectoryInEXT2ForChown(file *os.File, ext2fs *EstructuraExt2P2.EXT2Fil
 	return currentInodeNum, nil
 }
 
+func findDirectoryInEXT3ForChown(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, path string) (int32, error) {
+	if path == "/" {
+		return 0, nil
+	}
+
+	path = strings.TrimSuffix(path, "/")
+	if path == "" {
+		return 0, nil
+	}
+
+	components := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	currentInodeNum := int32(0)
+
+	for _, component := range components {
+		if component == "" {
+			continue
+		}
+
+		currentInode := &EstructuraarchivocarpetaP2.Inodo{}
+		err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+currentInodeNum*ext3fs.SuperBlock.S_inode_s), currentInode)
+		if err != nil {
+			return -1, fmt.Errorf("error leyendo inodo del directorio: %v", err)
+		}
+
+		if currentInode.Itype != 0 {
+			return -1, fmt.Errorf("'%s' no es un directorio", component)
+		}
+
+		nextInodeNum, err := findFileInDirectoryEXT3ForChown(file, ext3fs, currentInode, component)
+		if err != nil || nextInodeNum == -1 {
+			return -1, fmt.Errorf("no se encontró '%s' en el directorio", component)
+		}
+
+		currentInodeNum = nextInodeNum
+	}
+
+	return currentInodeNum, nil
+}
+
 // findFileInDirectoryEXT2ForChown busca un archivo o directorio en un directorio específico
 func findFileInDirectoryEXT2ForChown(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem, dirInode *EstructuraarchivocarpetaP2.Inodo, fileName string) (int32, error) {
 	if dirInode.Itype != 0 {
@@ -390,6 +585,35 @@ func findFileInDirectoryEXT2ForChown(file *os.File, ext2fs *EstructuraExt2P2.EXT
 		block := &BloquesP2.BloqueCarpeta{}
 
 		err := utilitiesP2.ReadStruct(file, int64(ext2fs.SuperBlock.S_block_start+blockNum*ext2fs.SuperBlock.S_block_s), block)
+		if err != nil {
+			continue
+		}
+
+		// Buscar en las entradas del bloque
+		for j := 0; j < 4; j++ {
+			if !block.IsEntryEmpty(j) {
+				entryName, entryInodeNum, _ := block.GetEntry(j)
+				if entryName == fileName {
+					return entryInodeNum, nil
+				}
+			}
+		}
+	}
+
+	return -1, fmt.Errorf("no se encontró '%s' en el directorio", fileName)
+}
+
+func findFileInDirectoryEXT3ForChown(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, dirInode *EstructuraarchivocarpetaP2.Inodo, fileName string) (int32, error) {
+	if dirInode.Itype != 0 {
+		return -1, fmt.Errorf("el inodo no es un directorio")
+	}
+
+	// Buscar en bloques directos
+	for i := 0; i < 12 && dirInode.Iblock[i] != -1; i++ {
+		blockNum := dirInode.Iblock[i]
+		block := &BloquesP2.BloqueCarpeta{}
+
+		err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_block_start+blockNum*ext3fs.SuperBlock.S_block_s), block)
 		if err != nil {
 			continue
 		}

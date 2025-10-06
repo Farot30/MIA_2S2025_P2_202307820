@@ -2,6 +2,7 @@ package commandsP2
 
 import (
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt3 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	session "MIA_2S2025_P2_202307820/Session"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
@@ -55,6 +56,17 @@ func CAT(args []string) {
 		return
 	}
 
+	fsType := int32(2) // Por defecto EXT2
+	{
+		file, err := os.Open(mountedPartition.Path)
+		if err == nil {
+			sb := &estructuraArchivoCarpeta.SuperBloque{}
+			utilitiesP2.ReadStruct(file, int64(mountedPartition.Start), sb)
+			fsType = sb.S_filesystem_type
+			file.Close()
+		}
+	}
+
 	// Procesar cada archivo
 	fmt.Printf("=== CONTENIDO DE ARCHIVOS ===\n\n")
 
@@ -66,7 +78,15 @@ func CAT(args []string) {
 		fmt.Printf("--- Archivo %d: %s ---\n", i+1, filePath)
 
 		// Leer y mostrar el contenido del archivo
-		content, err := readFileContent(mountedPartition, filePath, sessionInfo.UID, sessionInfo.GID)
+		var content string
+		var err error
+
+		if fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
+			content, err = readFileFromEXT3(mountedPartition, filePath, sessionInfo)
+		} else {
+			content, err = readFileContent(mountedPartition, filePath, sessionInfo.UID, sessionInfo.GID)
+		}
+
 		if err != nil {
 			fmt.Printf("Error: %s\n", err)
 			continue
@@ -86,6 +106,40 @@ func CAT(args []string) {
 
 	fmt.Printf("\n=== FIN DE CONTENIDO ===\n")
 	fmt.Printf("Total de archivos procesados: %d\n", len(files))
+}
+
+func readFileFromEXT3(partition MountedPartition, filePath string, sessionInfo *session.UserSession) (string, error) {
+	// Abrir el archivo del disco
+	file, err := os.OpenFile(partition.Path, os.O_RDWR, 0666)
+	if err != nil {
+		return "", fmt.Errorf("error abriendo el disco '%s': %s", partition.Path, err)
+	}
+	defer file.Close()
+
+	// Leer el sistema EXT3 de la partición
+	ext3fs, err := EstructuraExt3.ReadEXT3FileSystem(partition.Path, getPartitionStartOffset(partition))
+	if err != nil {
+		return "", fmt.Errorf("error leyendo sistema EXT3: %s", err)
+	}
+
+	// Verificar que el sistema esté formateado
+	if ext3fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return "", fmt.Errorf("la partición no tiene formato EXT3 válido")
+	}
+
+	// Leer el archivo usando EXT3
+	content, err := ext3fs.LeerArchivo(filePath)
+	if err != nil {
+		return "", fmt.Errorf("error leyendo archivo '%s': %s", filePath, err)
+	}
+
+	// Registrar la operación en el journal
+	err = ext3fs.AddJournalEntry(EstructuraExt3.OPERATION_READ, filePath, "Archivo leído")
+	if err != nil {
+		fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
+	}
+
+	return content, nil
 }
 
 // readFileFromEXT2 lee el contenido real de un archivo desde el sistema EXT2

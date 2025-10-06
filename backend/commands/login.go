@@ -3,6 +3,7 @@ package commandsP2
 import (
 	bloques "MIA_2S2025_P2_202307820/Bloques"
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	session "MIA_2S2025_P2_202307820/Session"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	structuresP2 "MIA_2S2025_P2_202307820/structures"
@@ -47,8 +48,21 @@ func LOGIN(args []string) {
 		return
 	}
 
-	// Autenticar usuario
-	authenticatedUser, userGroup, err := authenticateUser(mountedPartition, user, pass)
+	fsType, err := getFileSystemType(mountedPartition)
+	if err != nil {
+		fmt.Printf("Error obteniendo tipo de sistema de archivos: %s\n", err)
+		return
+	}
+
+	var authenticatedUser *User
+	var userGroup *Group
+
+	if fsType == estructuraArchivoCarpeta.EXT2_FILESYSTEM_TYPE {
+		authenticatedUser, userGroup, err = authenticateUser(mountedPartition, user, pass)
+	} else if fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
+		authenticatedUser, userGroup, err = authenticateUserEXT3(mountedPartition, user, pass)
+	}
+
 	if err != nil {
 		fmt.Printf("Error de autenticación: %s\n", err)
 		return
@@ -150,6 +164,57 @@ func authenticateUser(partition MountedPartition, username, password string) (*U
 	return foundUser, foundGroup, nil
 }
 
+func authenticateUserEXT3(partition MountedPartition, username, password string) (*User, *Group, error) {
+
+	// Leer el archivo users.txt de la partición
+	usersContent, err := readUsersFileEXT3(partition)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error accediendo al sistema de usuarios: %s", err)
+	}
+
+	users, groups := parseUsersFile(usersContent)
+
+	var foundUser *User
+	for _, user := range users {
+		if strings.EqualFold(user.Username, username) {
+			if user.UID == 0 {
+				return nil, nil, fmt.Errorf("el usuario '%s' está eliminado", username)
+			}
+			foundUser = &user
+			break
+		}
+	}
+
+	if foundUser == nil {
+		fmt.Printf("DEBUG: Usuario '%s' no encontrado en la lista de %d usuarios\n",
+			username, len(users))
+		return nil, nil, fmt.Errorf("el usuario '%s' no existe", username)
+	}
+
+	if foundUser.Password != password {
+		return nil, nil, fmt.Errorf("contraseña incorrecta para el usuario '%s'", username)
+	}
+
+	// Buscar el grupo del usuario
+	var foundGroup *Group
+	for _, group := range groups {
+		if group.GID == foundUser.GroupID {
+			if group.GID == 0 {
+				return nil, nil, fmt.Errorf("el grupo del usuario está eliminado")
+			}
+			foundGroup = &group
+			break
+		}
+	}
+
+	if foundGroup == nil {
+		return nil, nil, fmt.Errorf("grupo del usuario '%s' no encontrado", username)
+	}
+
+	return foundUser, foundGroup, nil
+
+}
+
 // readUsersFile lee el contenido del archivo users.txt de la partición
 func readUsersFile(partition MountedPartition) (string, error) {
 
@@ -187,6 +252,43 @@ func readUsersFile(partition MountedPartition) (string, error) {
 
 	// Leer el contenido del archivo desde sus bloques
 	content, err := readFileContentFromBlocks(file, ext2fs, usersInode)
+	if err != nil {
+		return "", fmt.Errorf("error leyendo contenido de users.txt: %s", err)
+	}
+
+	return content, nil
+}
+
+func readUsersFileEXT3(partition MountedPartition) (string, error) {
+
+	file, err := os.OpenFile(partition.Path, os.O_RDONLY, 0666)
+	if err != nil {
+		return "", fmt.Errorf("error abriendo el disco '%s': %s", partition.Path, err)
+	}
+	defer file.Close()
+
+	ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(partition.Path, getPartitionStartOffset(partition))
+	if err != nil {
+		return "", fmt.Errorf("error leyendo sistema EXT3: %s", err)
+	}
+
+	if ext3fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return "", fmt.Errorf("la partición no tiene formato EXT3 válido")
+	}
+
+	usersInodeNum, err := findFileInRootDirectoryEXT3(file, ext3fs, "users.txt")
+	if err != nil {
+		return "", fmt.Errorf("archivo users.txt no encontrado: %s", err)
+	}
+
+	usersInode := &estructuraArchivoCarpeta.Inodo{}
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (usersInodeNum * ext3fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
+	if err != nil {
+		return "", fmt.Errorf("error leyendo inodo de users.txt: %s", err)
+	}
+
+	content, err := readFileContentFromBlocksEXT3(file, ext3fs, usersInode)
 	if err != nil {
 		return "", fmt.Errorf("error leyendo contenido de users.txt: %s", err)
 	}

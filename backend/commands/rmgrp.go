@@ -3,6 +3,7 @@ package commandsP2
 import (
 	bloques "MIA_2S2025_P2_202307820/Bloques"
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
+	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	session "MIA_2S2025_P2_202307820/Session"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
@@ -62,8 +63,21 @@ func RMGRP(args []string) {
 		return
 	}
 
-	// 8. Eliminar el grupo
-	err := removeGroup(mountedPartition, groupName)
+	fsType, err := getFileSystemType(mountedPartition)
+	if err != nil {
+		fmt.Printf("Error: no se pudo determinar el tipo de sistema de archivos\n")
+		return
+	}
+
+	if fsType == estructuraArchivoCarpeta.EXT2_FILESYSTEM_TYPE {
+		err = removeGroup(mountedPartition, groupName)
+	} else if fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
+		err = removeGroupEXT3(mountedPartition, groupName)
+	} else {
+		fmt.Printf("Error: Sistema de archivos '%s' no soportado para eliminar grupos\n", fsType)
+		return
+	}
+
 	if err != nil {
 		fmt.Printf("Error eliminando grupo: %s\n", err)
 		return
@@ -127,6 +141,63 @@ func removeGroup(partition MountedPartition, groupName string) error {
 	err = writeContentToFileRMGRP(file, ext2fs, usersInode, newContent, usersInodeNum)
 	if err != nil {
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
+	}
+
+	return nil
+}
+
+func removeGroupEXT3(partition MountedPartition, groupName string) error {
+
+	file, err := os.OpenFile(partition.Path, os.O_RDWR, 0666)
+	if err != nil {
+		return fmt.Errorf("error abriendo el disco '%s': %s", partition.Path, err)
+	}
+
+	defer file.Close()
+
+	ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(partition.Path, getPartitionStartOffset(partition))
+	if err != nil {
+		return fmt.Errorf("error leyendo sistema EXT3: %s", err)
+	}
+
+	if ext3fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return fmt.Errorf("la partición no tiene formato EXT3 válido")
+	}
+
+	userInodeNum, err := findFileInRootDirectoryEXT3(file, ext3fs, "users.txt")
+	if err != nil {
+		return fmt.Errorf("archivo users.txt no encontrado: %s", err)
+	}
+
+	userInode := &estructuraArchivoCarpeta.Inodo{}
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (userInodeNum * ext3fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, userInode)
+	if err != nil {
+		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
+	}
+
+	currentContent, err := readFileContentFromBlocksEXT3(file, ext3fs, userInode)
+	if err != nil {
+		return fmt.Errorf("error leyendo contenido de users.txt: %s", err)
+	}
+
+	newContent, groupFound := markGroupAsDeleted(currentContent, groupName)
+	if !groupFound {
+		return fmt.Errorf("el grupo '%s' no existe", groupName)
+	}
+
+	if hasUsersInGroup(currentContent, groupName) {
+		return fmt.Errorf("no se puede eliminar el grupo '%s': tiene usuarios asignados", groupName)
+	}
+
+	err = writeContentToFileRMGRPEXT3(file, ext3fs, userInode, newContent, userInodeNum)
+	if err != nil {
+		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
+	}
+
+	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RMGRP, "users.txt", fmt.Sprintf("Grupo '%s' eliminado por '%s'", groupName, session.GetCurrentSession().Username))
+	if err != nil {
+		return fmt.Errorf("error añadiendo entrada al journal: %s", err)
 	}
 
 	return nil
@@ -274,6 +345,59 @@ func writeContentToFileRMGRP(file *os.File, ext2fs *EstructuraExt2.EXT2FileSyste
 
 	// Escribir el inodo actualizado
 	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (inodeNum * ext2fs.SuperBlock.S_inode_s))
+	err := utilitiesP2.WriteStruct(file, inodeOffset, inode)
+	if err != nil {
+		return fmt.Errorf("error actualizando inodo: %s", err)
+	}
+
+	return nil
+}
+
+func writeContentToFileRMGRPEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *estructuraArchivoCarpeta.Inodo, content string, inodeNum int32) error {
+	contentBytes := []byte(content)
+	contentSize := int32(len(contentBytes))
+
+	blocks := inode.GetIblock()
+
+	bytesWritten := int32(0)
+	blockIndex := 0
+
+	for bytesWritten < contentSize && blockIndex < 16 {
+		blockNum := blocks[blockIndex]
+		if blockNum == -1 {
+			break
+		}
+
+		remainingBytes := contentSize - bytesWritten
+		bytesToWrite := int32(64)
+		if remainingBytes < bytesToWrite {
+			bytesToWrite = remainingBytes
+		}
+
+		fileBlock := &bloques.BloqueArchivo{}
+
+		copy(fileBlock.B_content[:], contentBytes[bytesWritten:bytesWritten+bytesToWrite])
+
+		if bytesToWrite < 64 {
+			for i := bytesToWrite; i < 64; i++ {
+				fileBlock.B_content[i] = 0
+			}
+		}
+
+		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
+		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
+		if err != nil {
+			return fmt.Errorf("error escribiendo bloque %d: %s", blockNum, err)
+		}
+
+		bytesWritten += bytesToWrite
+		blockIndex++
+	}
+
+	inode.SetSize(contentSize)
+	inode.UpdateModificationTime()
+
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
 	err := utilitiesP2.WriteStruct(file, inodeOffset, inode)
 	if err != nil {
 		return fmt.Errorf("error actualizando inodo: %s", err)
