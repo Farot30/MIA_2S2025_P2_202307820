@@ -210,10 +210,7 @@ func CambiarGrupoUsuarioEXT3(partition MountedPartition, username string, groupN
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_CHGRP, "/users.txt", fmt.Sprintf("Usuario %s cambiado al grupo %s", username, groupName))
-	if err != nil {
-		return fmt.Errorf("error añadiendo entrada al journal: %s", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHGRP, "/users.txt", fmt.Sprintf("Usuario %s cambiado al grupo %s", username, groupName))
 
 	fmt.Printf("Grupo del usuario '%s' cambiado exitosamente de '%s' a '%s'\n",
 		username, extractGroupFromUserLine(userLine), groupName)

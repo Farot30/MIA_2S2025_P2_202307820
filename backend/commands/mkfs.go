@@ -223,13 +223,13 @@ func MKFS(args []string) {
 
 		switch fileSystem {
 		// Formatear la partición primaria
-		case "2fs":
+		case "2FS":
 			err = formatPartitionEXT2(file, partitionStart, partitionSize)
 			if err != nil {
 				fmt.Printf("Error formateando la partición: %s\n", err)
 				return
 			}
-		case "3fs":
+		case "3FS":
 			err = FormatearParticionEXT3(file, partitionStart, partitionSize)
 			if err != nil {
 				fmt.Printf("Error formateando la partición: %s\n", err)
@@ -261,13 +261,13 @@ func MKFS(args []string) {
 
 		// Formatear la partición lógica
 		switch fileSystem {
-		case "2fs":
+		case "2FS":
 			err = formatPartitionEXT2(file, partitionStart, partitionSize)
 			if err != nil {
 				fmt.Printf("Error formateando la partición: %s\n", err)
 				return
 			}
-		case "3fs":
+		case "3FS":
 			err = FormatearParticionEXT3(file, partitionStart, partitionSize)
 			if err != nil {
 				fmt.Printf("Error formateando la partición: %s\n", err)
@@ -303,10 +303,21 @@ func MKFS(args []string) {
 		fmt.Printf("Error creando el archivo users.txt: %s\n", err)
 		return
 	}
+	switch fileSystem {
+	case "2FS":
+		fmt.Printf("\n=== FORMATEO COMPLETADO EXITOSAMENTE ===\n")
+		fmt.Printf("Partición %s (%s) formateada como EXT2\n", mountedPartition.Name, id)
+		fmt.Printf("Archivo users.txt creado en la raíz del sistema\n")
+	case "3FS":
+		fmt.Printf("\n=== FORMATEO COMPLETADO EXITOSAMENTE ===\n")
+		fmt.Printf("Partición %s (%s) formateada como EXT3\n", mountedPartition.Name, id)
+		fmt.Printf("Archivo users.txt creado en la raíz del sistema\n")
+	default:
+		fmt.Printf("\n=== FORMATEO COMPLETADO EXITOSAMENTE ===\n")
+		fmt.Printf("Partición %s (%s) formateada como EXT2\n", mountedPartition.Name, id)
+		fmt.Printf("Archivo users.txt creado en la raíz del sistema\n")
+	}
 
-	fmt.Printf("\n=== FORMATEO COMPLETADO EXITOSAMENTE ===\n")
-	fmt.Printf("Partición %s (%s) formateada como EXT2\n", mountedPartition.Name, id)
-	fmt.Printf("Archivo users.txt creado en la raíz del sistema\n")
 }
 
 // findLogicalPartitionInfo busca información de una partición lógica

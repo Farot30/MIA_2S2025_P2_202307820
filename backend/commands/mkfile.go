@@ -300,10 +300,7 @@ func createFileEXT3(partition MountedPartition, filePath string, createParents b
 		return fmt.Errorf("error creando archivo en sistema EXT3: %s", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKFILE, filePath, fmt.Sprintf("Archivo creado exitosamente: %s", filePath))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar éxito en el journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, filePath, fmt.Sprintf("Archivo creado exitosamente: %s", filePath))
 
 	return nil
 }

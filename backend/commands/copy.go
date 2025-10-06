@@ -112,10 +112,7 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 
 	// REGISTRO EN JOURNAL: Inicio de operación de copia
 	copyInfo := fmt.Sprintf("user=%s src=%s dst=%s", sessionInfo.Username, sourcePath, destPath)
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_start: "+copyInfo)
-	if err != nil {
-		fmt.Printf("WARNING: No se pudo registrar inicio de copia en journal: %v\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_start: "+copyInfo)
 
 	// Separar directorio padre y nombre del elemento fuente
 	sourceDir := filepath.Dir(sourcePath)
@@ -124,14 +121,14 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 	// Buscar el directorio padre del elemento fuente
 	sourceDirInodeNum, err := findDirectoryInEXT3ForCopy(file, ext3fs, sourceDir)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: source directory not found")
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: source directory not found")
 		return fmt.Errorf("no se pudo encontrar el directorio padre fuente '%s': %v", sourceDir, err)
 	}
 
 	// Buscar el directorio de destino
 	destDirInodeNum, err := findDirectoryInEXT3ForCopy(file, ext3fs, destPath)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: destination directory not found")
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: destination directory not found")
 		return fmt.Errorf("no se pudo encontrar el directorio destino '%s': %v", destPath, err)
 	}
 
@@ -152,14 +149,14 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 	// Verificar permisos de escritura en el directorio destino
 	canWrite, err := sessionP2.CheckPermissions(destDirInode, sessionP2.WRITE)
 	if err != nil || !canWrite {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, destPath, "copy_error: no write permissions")
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, destPath, "copy_error: no write permissions")
 		return fmt.Errorf("no tiene permisos de escritura en el directorio destino '%s'", destPath)
 	}
 
 	// Buscar el elemento a copiar en el directorio fuente
 	sourceInodeNum, err := findFileInDirectoryEXT3ForCopy(file, ext3fs, sourceDirInode, sourceName)
 	if err != nil || sourceInodeNum == -1 {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: source file not found")
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: source file not found")
 		return fmt.Errorf("no se pudo encontrar '%s' en '%s'", sourceName, sourceDir)
 	}
 
@@ -173,7 +170,7 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 	// Verificar permisos de lectura en el elemento fuente
 	canRead, err := sessionP2.CheckPermissions(sourceInode, sessionP2.READ)
 	if err != nil || !canRead {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: no read permissions")
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: no read permissions")
 		return fmt.Errorf("no tiene permisos de lectura sobre el elemento '%s'", sourceName)
 	}
 
@@ -188,9 +185,9 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 
 	// REGISTRO EN JOURNAL: Resultado de la operación
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: "+err.Error())
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: "+err.Error())
 	} else {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_success: "+destPath)
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_success: "+destPath)
 	}
 
 	return err
@@ -202,17 +199,14 @@ func copyFileInEXT3Preserve(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 
 	// REGISTRO EN JOURNAL: Inicio de copia de archivo
 	fileInfo := fmt.Sprintf("size=%d uid=%d gid=%d", sourceInode.Is, sourceInode.Iuid, sourceInode.Igid)
-	err := ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_copy_start: "+fileInfo)
-	if err != nil {
-		fmt.Printf("WARNING: No se pudo registrar inicio de copia de archivo en journal: %v\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_copy_start: "+fileInfo)
 
 	// 1. Leer todo el contenido del archivo fuente
 	fileContent, err := ReadFileContentCorrectEXT3(file, ext3fs, sourceInode)
 	if err != nil {
 		fmt.Printf("[WARNING] No se pudo leer contenido de archivo '%s': %v\n", fileName, err)
 		fileContent = []byte{} // Contenido vacío como fallback
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_read_error: "+err.Error())
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_read_error: "+err.Error())
 	}
 
 	// 2. Crear estructura de contenido para preservación
@@ -228,13 +222,13 @@ func copyFileInEXT3Preserve(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 	// 3. Recrear el archivo en el destino
 	err = createFileWithContentCopyEXT3(file, ext3fs, destDirInode, fileContentStruct)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_create_error: "+err.Error())
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_create_error: "+err.Error())
 		return fmt.Errorf("no se pudo crear archivo en destino: %v", err)
 	}
 
 	// REGISTRO EN JOURNAL: Éxito en copia de archivo
 	successInfo := fmt.Sprintf("copied %d bytes", len(fileContent))
-	ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_copy_success: "+successInfo)
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_copy_success: "+successInfo)
 
 	fmt.Printf("[COPY-FILE-EXT3] Archivo '%s' copiado exitosamente (%d bytes)\n", fileName, len(fileContent))
 	return nil
@@ -246,28 +240,25 @@ func copyDirectoryInEXT3Preserve(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fil
 
 	// REGISTRO EN JOURNAL: Inicio de copia de directorio
 	dirInfo := fmt.Sprintf("uid=%d gid=%d", sourceInode.Iuid, sourceInode.Igid)
-	err := ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_copy_start: "+dirInfo)
-	if err != nil {
-		fmt.Printf("WARNING: No se pudo registrar inicio de copia de directorio en journal: %v\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_copy_start: "+dirInfo)
 
 	// 1. Guardar todo el contenido del directorio recursivamente
 	dirContent, err := saveDirectoryContentCopyEXT3(file, ext3fs, sourceInode, dirName)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_save_error: "+err.Error())
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_save_error: "+err.Error())
 		return fmt.Errorf("no se pudo guardar contenido del directorio: %v", err)
 	}
 
 	// 2. Recrear el directorio en el destino (SIN eliminar el original)
 	newDirInodeNum, err := createDirectoryWithContentCopyEXT3(file, ext3fs, destDirInode, dirContent, sessionInfo)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_create_error: "+err.Error())
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_create_error: "+err.Error())
 		return fmt.Errorf("no se pudo recrear directorio en destino: %v", err)
 	}
 
 	// REGISTRO EN JOURNAL: Éxito en copia de directorio
 	successInfo := fmt.Sprintf("new_inode=%d children=%d", newDirInodeNum, len(dirContent.Children))
-	ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_copy_success: "+successInfo)
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_copy_success: "+successInfo)
 
 	fmt.Printf("[COPY-DIR-EXT3] Directorio '%s' copiado exitosamente (nuevo inodo: %d)\n", dirName, newDirInodeNum)
 	return nil
@@ -311,7 +302,7 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 				err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+entryInodeNum*ext3fs.SuperBlock.S_inode_s), entryInode)
 				if err != nil {
 					fmt.Printf("[WARNING] No se pudo leer inodo de '%s': %v\n", entryName, err)
-					ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "inode_read_error: "+err.Error())
+					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "inode_read_error: "+err.Error())
 					continue
 				}
 
@@ -319,7 +310,7 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 				canRead, err := sessionP2.CheckPermissions(entryInode, sessionP2.READ)
 				if err != nil || !canRead {
 					fmt.Printf("[WARNING] Sin permisos de lectura para '%s', saltando...\n", entryName)
-					ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "no_read_permissions")
+					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "no_read_permissions")
 					continue
 				}
 
@@ -329,7 +320,7 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 					if err != nil {
 						fmt.Printf("[WARNING] No se pudo leer contenido de archivo '%s': %v\n", entryName, err)
 						fileContent = []byte{} // Contenido vacío como fallback
-						ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "file_content_read_error: "+err.Error())
+						LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "file_content_read_error: "+err.Error())
 					}
 
 					dirContent.Children[entryName] = &DirectoryContent{
@@ -343,7 +334,7 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 
 					// Registro en journal de archivo guardado
 					saveInfo := fmt.Sprintf("size=%d", len(fileContent))
-					ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "file_saved: "+saveInfo)
+					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "file_saved: "+saveInfo)
 
 					fmt.Printf("[SAVE-FILE-EXT3] Archivo '%s' guardado (%d bytes)\n", entryName, len(fileContent))
 
@@ -352,14 +343,14 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 					subDirContent, err := saveDirectoryContentCopyEXT3(file, ext3fs, entryInode, entryName)
 					if err != nil {
 						fmt.Printf("[WARNING] No se pudo guardar subdirectorio '%s': %v\n", entryName, err)
-						ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "subdir_save_error: "+err.Error())
+						LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "subdir_save_error: "+err.Error())
 						continue
 					}
 
 					dirContent.Children[entryName] = subDirContent
 
 					// Registro en journal de directorio guardado
-					ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "dir_saved_recursive")
+					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "dir_saved_recursive")
 
 					fmt.Printf("[SAVE-DIR-EXT3] Directorio '%s' guardado recursivamente\n", entryName)
 				}
@@ -395,19 +386,19 @@ func createDirectoryWithContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.
 			_, err := createDirectoryWithContentCopyEXT3(file, ext3fs, newDirInode, content, sessionInfo)
 			if err != nil {
 				fmt.Printf("[WARNING] No se pudo recrear subdirectorio '%s': %v\n", name, err)
-				ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKDIR, name, "subdir_recreate_error: "+err.Error())
+				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, name, "subdir_recreate_error: "+err.Error())
 			} else {
-				ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKDIR, name, "subdir_recreated")
+				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, name, "subdir_recreated")
 			}
 		} else {
 			// Recrear archivo
 			err := createFileWithContentCopyEXT3(file, ext3fs, newDirInode, content)
 			if err != nil {
 				fmt.Printf("[WARNING] No se pudo recrear archivo '%s': %v\n", name, err)
-				ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKFILE, name, "file_recreate_error: "+err.Error())
+				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, name, "file_recreate_error: "+err.Error())
 			} else {
 				recreateInfo := fmt.Sprintf("size=%d", len(content.Content))
-				ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKFILE, name, "file_recreated: "+recreateInfo)
+				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, name, "file_recreated: "+recreateInfo)
 			}
 		}
 	}

@@ -212,10 +212,7 @@ func RenameFileOrDirectory(partition MountedPartition, path string, newName stri
 			return fmt.Errorf("error al actualizar el inodo del directorio padre: %v", err)
 		}
 
-		err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RENAME, path, fmt.Sprintf("Renombrado a '%s'", newName))
-		if err != nil {
-			return fmt.Errorf("error al agregar entrada al diario: %v", err)
-		}
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RENAME, path, fmt.Sprintf("Renombrado a '%s'", newName))
 
 		return nil
 	}

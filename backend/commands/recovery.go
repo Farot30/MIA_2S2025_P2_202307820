@@ -163,13 +163,8 @@ func recoverEXT3FileSystem(partition MountedPartition) error {
 	fmt.Printf("6. Registrando recuperación en el journal...\n")
 
 	// Registrar la operación de recuperación en el journal
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, "/",
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, "/",
 		fmt.Sprintf("Sistema recuperado exitosamente. %d operaciones procesadas", len(journalEntries)))
-	if err != nil {
-		fmt.Printf("   Advertencia: No se pudo registrar la recuperación en el journal: %s\n", err)
-	} else {
-		fmt.Printf("   ✓ Recuperación registrada en el journal\n")
-	}
 
 	return nil
 }
@@ -371,22 +366,129 @@ func verifyDeletion(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, path
 // que intentan restaurar el estado específico de archivos/directorios
 
 func recoverRename(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, path, content string) error {
-	// Implementación básica - verificar que el archivo tenga el nombre correcto
+	// Separar el directorio padre y el nombre actual
+	parentDir := filepath.Dir(path)
+	oldName := filepath.Base(path)
+
+	// Buscar el directorio padre
+	parentInodeNum, err := findDirectoryInEXT3ForRecovery(file, ext3fs, parentDir)
+	if err != nil {
+		return fmt.Errorf("no se pudo encontrar el directorio padre '%s': %v", parentDir, err)
+	}
+
+	// Leer el inodo del directorio padre
+	parentInode := &EstructuraarchivocarpetaP2.Inodo{}
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (parentInodeNum * ext3fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, parentInode)
+	if err != nil {
+		return fmt.Errorf("error leyendo inodo del directorio padre '%s': %v", parentDir, err)
+	}
+
+	// Buscar el archivo o directorio en el directorio padre
+	entryInodeNum, err := findFileInDirectoryEXT3ForRecovery(file, ext3fs, parentInode, oldName)
+	if err != nil || entryInodeNum == -1 {
+		return fmt.Errorf("no se pudo encontrar '%s' en el directorio '%s': %v", oldName, parentDir, err)
+	}
+
+	// Cambiar el nombre en el bloque del directorio
+	err = updateEntryNameInDirectory(file, ext3fs, parentInode, oldName, content)
+	if err != nil {
+		return fmt.Errorf("error actualizando el nombre de '%s' a '%s': %v", oldName, content, err)
+	}
+
+	fmt.Printf("      Nombre de '%s' cambiado a '%s'\n", path, content)
 	return nil
 }
 
 func recoverChmod(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, path, content string) error {
-	// Implementación básica - verificar permisos
+	// Buscar el inodo del archivo o directorio
+	inodeNum, err := findInodeByPath(file, ext3fs, path)
+	if err != nil {
+		return fmt.Errorf("no se pudo encontrar el inodo para '%s': %v", path, err)
+	}
+
+	// Leer el inodo
+	inode := &EstructuraarchivocarpetaP2.Inodo{}
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, inode)
+	if err != nil {
+		return fmt.Errorf("error leyendo inodo para '%s': %v", path, err)
+	}
+
+	// Actualizar los permisos
+	var newPermissions [3]byte
+	_, err = fmt.Sscanf(content, "%d,%d,%d", &newPermissions[0], &newPermissions[1], &newPermissions[2])
+	if err != nil {
+		return fmt.Errorf("error interpretando los permisos '%s': %v", content, err)
+	}
+	inode.Iperm = newPermissions
+
+	// Escribir el inodo actualizado
+	err = utilitiesP2.WriteStruct(file, inodeOffset, inode)
+	if err != nil {
+		return fmt.Errorf("error escribiendo inodo actualizado para '%s': %v", path, err)
+	}
+
+	fmt.Printf("      Permisos de '%s' restaurados a %d,%d,%d\n", path, newPermissions[0], newPermissions[1], newPermissions[2])
 	return nil
 }
-
 func recoverChown(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, path, content string) error {
-	// Implementación básica - verificar propietario
+	// Buscar el inodo del archivo o directorio
+	inodeNum, err := findInodeByPath(file, ext3fs, path)
+	if err != nil {
+		return fmt.Errorf("no se pudo encontrar el inodo para '%s': %v", path, err)
+	}
+
+	// Leer el inodo
+	inode := &EstructuraarchivocarpetaP2.Inodo{}
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, inode)
+	if err != nil {
+		return fmt.Errorf("error leyendo inodo para '%s': %v", path, err)
+	}
+
+	// Actualizar el propietario y el grupo
+	var newUID, newGID int32
+	_, err = fmt.Sscanf(content, "%d,%d", &newUID, &newGID)
+	if err != nil {
+		return fmt.Errorf("error interpretando UID y GID '%s': %v", content, err)
+	}
+	inode.Iuid = newUID
+	inode.Igid = newGID
+
+	// Escribir el inodo actualizado
+	err = utilitiesP2.WriteStruct(file, inodeOffset, inode)
+	if err != nil {
+		return fmt.Errorf("error escribiendo inodo actualizado para '%s': %v", path, err)
+	}
+
+	fmt.Printf("      Propietario y grupo de '%s' restaurados a UID=%d, GID=%d\n", path, newUID, newGID)
 	return nil
 }
 
 func recoverEdit(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, path, content string) error {
-	// Implementación básica - verificar contenido del archivo
+	// Buscar el inodo del archivo
+	inodeNum, err := findInodeByPath(file, ext3fs, path)
+	if err != nil {
+		return fmt.Errorf("no se pudo encontrar el inodo para '%s': %v", path, err)
+	}
+
+	// Leer el inodo
+	inode := &EstructuraarchivocarpetaP2.Inodo{}
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, inode)
+	if err != nil {
+		return fmt.Errorf("error leyendo inodo para '%s': %v", path, err)
+	}
+
+	// Escribir el contenido en los bloques asignados al archivo
+	contentBytes := []byte(content)
+	err = writeContentToFileEXT3(file, ext3fs, inode, string(contentBytes), inodeNum)
+	if err != nil {
+		return fmt.Errorf("error escribiendo contenido en '%s': %v", path, err)
+	}
+
+	fmt.Printf("      Contenido de '%s' restaurado\n", path)
 	return nil
 }
 
@@ -996,4 +1098,62 @@ func addEntryToDirectoryForRecovery(file *os.File, ext3fs *EstructuraExt3P2.EXT3
 	}
 
 	return nil
+}
+
+func findInodeByPath(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, path string) (int32, error) {
+	if path == "/" {
+		return 0, nil // El inodo raíz siempre es 0
+	}
+
+	parentDir := filepath.Dir(path)
+	fileName := filepath.Base(path)
+
+	// Buscar el directorio padre
+	parentInodeNum, err := findDirectoryInEXT3ForRecovery(file, ext3fs, parentDir)
+	if err != nil {
+		return -1, fmt.Errorf("no se pudo encontrar el directorio padre '%s': %v", parentDir, err)
+	}
+
+	// Leer el inodo del directorio padre
+	parentInode := &EstructuraarchivocarpetaP2.Inodo{}
+	err = utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+parentInodeNum*ext3fs.SuperBlock.S_inode_s), parentInode)
+	if err != nil {
+		return -1, fmt.Errorf("error leyendo inodo del directorio padre '%s': %v", parentDir, err)
+	}
+
+	// Buscar el archivo o directorio en el directorio padre
+	return findFileInDirectoryEXT3ForRecovery(file, ext3fs, parentInode, fileName)
+}
+
+func updateEntryNameInDirectory(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, dirInode *EstructuraarchivocarpetaP2.Inodo, oldName, newName string) error {
+	for i := 0; i < 12 && dirInode.Iblock[i] != -1; i++ {
+		blockNum := dirInode.Iblock[i]
+		dirBlock := &BloquesP2.BloqueCarpeta{}
+
+		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
+		err := utilitiesP2.ReadStruct(file, blockOffset, dirBlock)
+		if err != nil {
+			continue
+		}
+
+		// Buscar la entrada con el nombre antiguo
+		for j := 0; j < 4; j++ {
+			if dirBlock.B_content[j].B_inodo != -1 {
+				entryName := strings.TrimRight(string(dirBlock.B_content[j].B_name[:]), "\x00")
+				if entryName == oldName {
+					// Actualizar el nombre
+					copy(dirBlock.B_content[j].B_name[:], newName)
+
+					// Escribir el bloque actualizado
+					err = utilitiesP2.WriteStruct(file, blockOffset, dirBlock)
+					if err != nil {
+						return fmt.Errorf("error escribiendo bloque actualizado: %v", err)
+					}
+					return nil
+				}
+			}
+		}
+	}
+
+	return fmt.Errorf("no se encontró la entrada '%s' en el directorio", oldName)
 }

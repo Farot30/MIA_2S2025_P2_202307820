@@ -171,10 +171,7 @@ func moveInEXT3(file *os.File, partition MountedPartition, sourcePath, destPath 
 		return fmt.Errorf("no se pudo leer el sistema EXT3: %v", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MOVE, sourcePath, fmt.Sprintf("Iniciando movimiento de '%s' a '%s'", sourcePath, destPath))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar inicio de operación en el journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, sourcePath, fmt.Sprintf("Iniciando movimiento de '%s' a '%s'", sourcePath, destPath))
 
 	// Separar directorio padre y nombre del elemento fuente
 	sourceDir := filepath.Dir(sourcePath)
@@ -313,10 +310,7 @@ func moveFileInEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, sour
 		return fmt.Errorf("no se pudo remover entrada del directorio fuente: %v", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MOVE, fileName, "Archivo movido exitosamente")
-	if err != nil {
-		return fmt.Errorf("no se pudo agregar entrada al journal: %v", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, fileName, "Archivo movido exitosamente")
 
 	fmt.Printf("[MOVE-FILE-EXT3] Archivo movido exitosamente\n")
 	return nil
@@ -356,10 +350,7 @@ func moveDirectoryInEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem,
 		return fmt.Errorf("no se pudo remover entrada del directorio fuente: %v", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MOVE, dirName, "Directorio movido exitosamente")
-	if err != nil {
-		return fmt.Errorf("no se pudo agregar entrada al journal: %v", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, dirName, "Directorio movido exitosamente")
 
 	fmt.Printf("[MOVE-DIR-EXT3] Directorio movido exitosamente (nuevo inodo: %d)\n", newDirInodeNum)
 	return nil

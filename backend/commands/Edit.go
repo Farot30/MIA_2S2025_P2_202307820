@@ -242,10 +242,7 @@ func EditFile(partition MountedPartition, filePath string, newContent string, se
 		}
 
 		// Registrar la operación en el journal
-		err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_EDIT, filePath, newContent)
-		if err != nil {
-			fmt.Printf("Advertencia: No se pudo registrar la operación en el journal: %v\n", err)
-		}
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, filePath, newContent)
 
 		// Actualizar el superbloque
 		err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+fileInodeNum*ext3fs.SuperBlock.S_inode_s), fileInode)

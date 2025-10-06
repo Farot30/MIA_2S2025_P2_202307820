@@ -107,15 +107,12 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	}
 
 	// REGISTRO EN JOURNAL: Inicio de operación
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Iniciando creación de grupo: %s", groupName))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar inicio de operación en journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Iniciando creación de grupo: %s", groupName))
 
 	// Buscar el archivo users.txt en el directorio raíz
 	usersInodeNum, err := findFileInRootDirectoryEXT3(file, ext3fs, "users.txt")
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error: users.txt no encontrado - %s", err.Error()))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error: users.txt no encontrado - %s", err.Error()))
 		return fmt.Errorf("archivo users.txt no encontrado: %s", err)
 	}
 
@@ -124,20 +121,20 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (usersInodeNum * ext3fs.SuperBlock.S_inode_s))
 	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error leyendo inodo users.txt: %s", err.Error()))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error leyendo inodo users.txt: %s", err.Error()))
 		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
 	}
 
 	// Leer el contenido actual del archivo users.txt
 	currentContent, err := readFileContentFromBlocksEXT3(file, ext3fs, usersInode)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error leyendo contenido users.txt: %s", err.Error()))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error leyendo contenido users.txt: %s", err.Error()))
 		return fmt.Errorf("error leyendo contenido de users.txt: %s", err)
 	}
 
 	// Verificar que el grupo no existe ya
 	if groupExists(currentContent, groupName) {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error: Grupo %s ya existe", groupName))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error: Grupo %s ya existe", groupName))
 		return fmt.Errorf("el grupo '%s' ya existe", groupName)
 	}
 
@@ -145,10 +142,7 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	nextGID := getNextGroupID(currentContent)
 
 	// REGISTRO EN JOURNAL: Asignación de GID
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Asignando GID %d al grupo %s", nextGID, groupName))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar asignación de GID en journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Asignando GID %d al grupo %s", nextGID, groupName))
 
 	// Crear la entrada del nuevo grupo
 	groupEntry := fmt.Sprintf("%d,G,%s", nextGID, groupName)
@@ -163,15 +157,12 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	// Escribir el contenido actualizado de vuelta al archivo
 	err = writeContentToFileEXT3(file, ext3fs, usersInode, newContent, usersInodeNum)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error escribiendo users.txt: %s", err.Error()))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error escribiendo users.txt: %s", err.Error()))
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
 	// REGISTRO EN JOURNAL: Operación completada exitosamente
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Grupo %s creado exitosamente con GID %d", groupName, nextGID))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar éxito de operación en journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Grupo %s creado exitosamente con GID %d", groupName, nextGID))
 
 	fmt.Printf("Grupo '%s' creado en EXT3 con journaling (GID: %d)\n", groupName, nextGID)
 	return nil
@@ -325,10 +316,7 @@ func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 	}
 
 	// Registrar en journal el inicio de escritura
-	err := ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Escribiendo %d bytes en %d bloques", contentSize, blocksNeeded))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar escritura en journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Escribiendo %d bytes en %d bloques", contentSize, blocksNeeded))
 
 	// Escribir el contenido en los bloques existentes
 	bytesWritten := int32(0)
@@ -365,7 +353,7 @@ func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
 		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
 		if err != nil {
-			ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Error escribiendo bloque %d: %s", blockNum, err.Error()))
+			LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Error escribiendo bloque %d: %s", blockNum, err.Error()))
 			return fmt.Errorf("error escribiendo bloque %d: %s", blockNum, err)
 		}
 
@@ -379,17 +367,14 @@ func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 
 	// Escribir el inodo actualizado
 	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
-	err = utilitiesP2.WriteStruct(file, inodeOffset, inode)
+	err := utilitiesP2.WriteStruct(file, inodeOffset, inode)
 	if err != nil {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Error actualizando inodo: %s", err.Error()))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Error actualizando inodo: %s", err.Error()))
 		return fmt.Errorf("error actualizando inodo: %s", err)
 	}
 
 	// Registrar en journal el éxito de la escritura
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Escritura completada: %d bytes escritos", bytesWritten))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar éxito de escritura en journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Escritura completada: %d bytes escritos", bytesWritten))
 
 	return nil
 }

@@ -205,10 +205,7 @@ func createDirectoryEXT3(partition MountedPartition, dirPath string, createParen
 		return fmt.Errorf("error creando directorio en sistema EXT3: %s", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKDIR, dirPath, sessionInfo.Username)
-	if err != nil {
-		return fmt.Errorf("error agregando entrada al journal: %s", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirPath, sessionInfo.Username)
 
 	return nil
 }

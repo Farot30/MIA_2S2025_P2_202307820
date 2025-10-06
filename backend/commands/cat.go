@@ -134,10 +134,7 @@ func readFileFromEXT3(partition MountedPartition, filePath string, sessionInfo *
 	}
 
 	// Registrar la operación en el journal
-	err = ext3fs.AddJournalEntry(EstructuraExt3.OPERATION_READ, filePath, "Archivo leído")
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, fmt.Sprintf("%d", len(content)))
 
 	return content, nil
 }

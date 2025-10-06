@@ -165,7 +165,7 @@ func createUserExt3(file *os.File, partition MountedPartition, username, passwor
 	}
 
 	if !groupExistsAndActive(currentContent, groupName) {
-		ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKUSR, "/", fmt.Sprintf("Error: El grupo '%s' no existe", groupName))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKUSR, "/", fmt.Sprintf("Error: El grupo '%s' no existe", groupName))
 		return fmt.Errorf("el grupo '%s' no existe", groupName)
 	}
 
@@ -201,10 +201,7 @@ func createUserExt3(file *os.File, partition MountedPartition, username, passwor
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MKUSR, "/", fmt.Sprintf("Creación de usuario '%s'", username))
-	if err != nil {
-		return fmt.Errorf("error registrando en el journal: %s", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKUSR, "/", fmt.Sprintf("Creación de usuario '%s'", username))
 
 	return nil
 }

@@ -206,32 +206,35 @@ func executeCommand(input string) {
 
 	// Definir parámetros permitidos por comando
 	allowedParams := map[string][]string{
-		"mkdisk":  {"size", "unit", "path", "fit"},
-		"rmdisk":  {"path"},
-		"fdisk":   {"type", "unit", "name", "size", "path", "fit", "delete", "add"},
-		"mount":   {"path", "name"},
-		"unmount": {"id"},
-		"mounted": {},
-		"mkfs":    {"id", "type", "fs"},
-		"login":   {"user", "pass", "id"},
-		"move":    {"path", "destino"},
-		"find":    {"path", "name"},
-		"chown":   {"path", "usuario", "r"},
-		"chmod":   {"path", "ugo", "r"},
-		"logout":  {},
-		"cat":     {"file1", "file"},
-		"edit":    {"path", "contenido"},
-		"rename":  {"path", "name"},
-		"copy":    {"path", "destino"},
-		"mkgrp":   {"name"},
-		"rmgrp":   {"name"},
-		"mkusr":   {"user", "pass", "grp"},
-		"rmusr":   {"user"},
-		"chgrp":   {"user", "grp"},
-		"mkdir":   {"path", "p"},
-		"mkfile":  {"path", "size", "cont", "r"},
-		"remove":  {"path"},
-		"rep":     {"id", "path", "name", "path_file_ls"},
+		"mkdisk":     {"size", "unit", "path", "fit"},
+		"rmdisk":     {"path"},
+		"fdisk":      {"type", "unit", "name", "size", "path", "fit", "delete", "add"},
+		"mount":      {"path", "name"},
+		"unmount":    {"id"},
+		"mounted":    {},
+		"mkfs":       {"id", "type", "fs"},
+		"login":      {"user", "pass", "id"},
+		"move":       {"path", "destino"},
+		"find":       {"path", "name"},
+		"chown":      {"path", "usuario", "r"},
+		"chmod":      {"path", "ugo", "r"},
+		"logout":     {},
+		"cat":        {"file1", "file"},
+		"edit":       {"path", "contenido"},
+		"rename":     {"path", "name"},
+		"copy":       {"path", "destino"},
+		"mkgrp":      {"name"},
+		"rmgrp":      {"name"},
+		"mkusr":      {"user", "pass", "grp"},
+		"rmusr":      {"user"},
+		"chgrp":      {"user", "grp"},
+		"mkdir":      {"path", "p"},
+		"mkfile":     {"path", "size", "cont", "r"},
+		"remove":     {"path"},
+		"rep":        {"id", "path", "name", "path_file_ls"},
+		"recovery":   {"id"},
+		"loss":       {"id"},
+		"journaling": {"id"},
 	}
 
 	cmdName := strings.ToLower(cmdParts[0])
@@ -301,6 +304,12 @@ func executeCommand(input string) {
 		commandsP2.CHOWN(cmdParts[1:])
 	case "chmod":
 		commandsP2.CHMOD(cmdParts[1:])
+	case "recovery":
+		commandsP2.RECOVERY(cmdParts[1:])
+	case "loss":
+		commandsP2.LOSS(cmdParts[1:])
+	case "journaling":
+		commandsP2.JOURNALING(cmdParts[1:])
 	default:
 		fmt.Printf("Error: Comando '%s' no reconocido\n", cmdParts[0])
 	}
@@ -443,6 +452,9 @@ func startServer() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(debugInfo)
 	})
+
+	// En main.go, agregar la ruta para journaling
+	http.HandleFunc("/journaling", commandsP2.HandleJournalingAPI)
 
 	// Iniciar servidor
 	log.Fatal(http.ListenAndServe(":8080", nil))

@@ -126,14 +126,11 @@ func RemoveInEXT3(partition MountedPartition, path string, sessionInfo *session.
 
 	// 4. Registrar la operación en el journal (específico de EXT3)
 	// Añadir entrada al journal antes de realizar la operación
-	operation := EstructuraExt3P2.OPERATION_RMFILE
+	var operation string
 	if isDirectory(file, ext3fs.SuperBlock, path) {
 		operation = EstructuraExt3P2.OPERATION_RMDIR
-	}
-
-	err = ext3fs.AddJournalEntry(operation, path, "")
-	if err != nil {
-		return fmt.Errorf("error registrando operación en journal: %s", err)
+	} else {
+		operation = EstructuraExt3P2.OPERATION_RMFILE
 	}
 
 	// 5. Eliminar el archivo o carpeta (reutiliza la función de EXT2)
@@ -144,14 +141,8 @@ func RemoveInEXT3(partition MountedPartition, path string, sessionInfo *session.
 		StartOffset:   ext3fs.StartOffset,
 	}, path, sessionInfo)
 
-	if err != nil {
-		// Registrar el error en el journal
-		ext3fs.AddJournalEntry(operation+"_error", path, err.Error())
-		return err
-	}
-
 	// Registrar el éxito en el journal
-	ext3fs.AddJournalEntry(operation+"_success", path, "")
+	LogEXT3Operation(operation, path, "")
 	return nil
 }
 

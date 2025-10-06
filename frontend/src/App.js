@@ -6,6 +6,7 @@ import FileUploader from './components/FileUploader';
 import ReportsViewer from './components/ReportsViewer';
 import Login from './components/Login';
 import FileSystemExplorer from './components/FileSystemExplorer';
+import JournalingViewer from './components/JournalingViewer';
 import './components/ReportsViewer.css';
 
 function App() {
@@ -54,6 +55,8 @@ function App() {
       setLoginLoading(false);
     }
   };
+
+  
 
   const handleLogout = async () => {
     try {
@@ -171,6 +174,14 @@ function App() {
               📁 Explorador
             </button>
           )}
+          {session && (
+            <button 
+              className={`nav-tab ${activeTab === 'journaling' ? 'active' : ''}`}
+              onClick={() => setActiveTab('journaling')}
+            >
+              📜 Journaling
+            </button>
+          )}
         </nav>
       </header>
 
@@ -237,6 +248,9 @@ fdisk -size=1000 -path=disk1.mia -name=part1
             onExecuteCommand={executeCommands}
             setOutput={setOutput}
           />
+        )}
+        {activeTab === 'journaling' && session && (
+          <JournalingViewer session={session} />
         )}
       </main>
     </div>

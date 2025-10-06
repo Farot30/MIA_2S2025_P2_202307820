@@ -23,7 +23,6 @@ const (
 	INODE_SIZE      = int32(unsafe.Sizeof(EstructuraarchivocarpetaP2.Inodo{}))
 	BLOCK_SIZE      = 64
 	BITMAP_BYTE     = 1
-	JOURNAL_SIZE    = 50 // Tamaño fijo del journaling para cada inodo
 )
 
 // CalcularEXT3Estructuras calcula el número de inodos y bloques para EXT3
@@ -31,7 +30,9 @@ const (
 // tamaño_particion = sizeOf(superblock) + n * sizeOf(Journaling) + n + 3 * n + n * sizeOf(inodos) + 3 * n * sizeOf(block)
 // n = floor((partitionSize - SUPERBLOCK_SIZE) / (JOURNAL_SIZE + 1 + 3 + INODE_SIZE + 3*BLOCK_SIZE))
 func CalcularEXT3Estructuras(partitionSize int32) (inodes int32, blocks int32) {
-	denominator := float64(JOURNAL_SIZE + 1 + 3 + INODE_SIZE + 3*BLOCK_SIZE)
+	// Usar GetJournalSize() en lugar de JOURNAL_SIZE
+	journalSize := GetJournalSize()
+	denominator := float64(journalSize + 1 + 3 + INODE_SIZE + 3*BLOCK_SIZE)
 	numerator := float64(partitionSize - SUPERBLOCK_SIZE)
 	n := int32(numerator / denominator)
 	if n < 0 {
@@ -50,7 +51,7 @@ func CrearEXT3FileSystem(partitionPath string, partitionSize int32, startOffset 
 	currentOffset := SUPERBLOCK_SIZE
 
 	// Journaling (n * JOURNAL_SIZE)
-	journalingSize := inodes * JOURNAL_SIZE
+	journalingSize := inodes * GetJournalSize()
 	currentOffset += journalingSize
 
 	// Bitmap de inodos
@@ -105,7 +106,7 @@ func (fs *EXT3FileSystem) GetStructureSizesEXT3() map[string]int32 {
 
 	sizes := make(map[string]int32)
 	sizes["SuperBlock"] = SUPERBLOCK_SIZE
-	sizes["Journaling"] = inodesCount * JOURNAL_SIZE
+	sizes["Journaling"] = inodesCount * GetJournalSize()
 	sizes["BitmapInode"] = (inodesCount + 7) / 8
 	sizes["BitmapBlock"] = (blocksCount + 7) / 8
 	sizes["InodeTable"] = inodesCount * INODE_SIZE
@@ -183,7 +184,7 @@ func ValidarTamañoParticionEXT3(partitionSize int32) (bool, string, map[string]
 	}
 
 	minSpace := SUPERBLOCK_SIZE +
-		(inodes * JOURNAL_SIZE) +
+		(inodes * GetJournalSize()) +
 		((inodes + 7) / 8) +
 		((blocks + 7) / 8) +
 		(inodes * INODE_SIZE) +
@@ -196,7 +197,7 @@ func ValidarTamañoParticionEXT3(partitionSize int32) (bool, string, map[string]
 		"inodes_count":      inodes,
 		"blocks_count":      blocks,
 		"superblock_size":   SUPERBLOCK_SIZE,
-		"journaling_size":   inodes * JOURNAL_SIZE,
+		"journaling_size":   inodes * GetJournalSize(),
 		"bitmap_inode_size": (inodes + 7) / 8,
 		"bitmap_block_size": (blocks + 7) / 8,
 		"inode_table_size":  inodes * INODE_SIZE,
@@ -261,7 +262,7 @@ func (fs *EXT3FileSystem) FormatoParticionEXT3() error {
 
 	// 5. Inicializar el journaling (específico de EXT3)
 	journalingStart := fs.StartOffset + SUPERBLOCK_SIZE
-	journalingSize := fs.SuperBlock.S_inodes_count * JOURNAL_SIZE
+	journalingSize := fs.SuperBlock.S_inodes_count * GetJournalSize()
 
 	// Limpiar el área de journaling primero
 	journalingData := make([]byte, journalingSize)
@@ -364,7 +365,7 @@ func CalcularPartitionSizeEXT3(inodesCount, blocksCount int32) int32 {
 	bitmapBlockSize := (blocksCount + 7) / 8
 	inodeTableSize := inodesCount * INODE_SIZE
 	blockTableSize := blocksCount * BLOCK_SIZE
-	journalingSize := inodesCount * JOURNAL_SIZE
+	journalingSize := inodesCount * GetJournalSize()
 
 	totalSize := superBloque + journalingSize + bitmapInodeSize + bitmapBlockSize + inodeTableSize + blockTableSize
 	return totalSize

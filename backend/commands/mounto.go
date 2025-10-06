@@ -228,12 +228,9 @@ func mountPrimaryPartition(diskPath, partitionName string, partitionIndex int, p
 
 	fsType, err := detectFileSystemType(mountedPartition)
 	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
-		ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
+		_, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
 		if err == nil {
-			err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición montada: %s", partitionName))
-			if err != nil {
-				fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
-			}
+			LogEXT3Operation(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición montada: %s", partitionName))
 		}
 	}
 
@@ -317,12 +314,9 @@ func mountLogicalPartition(diskPath, partitionName string, partitionStart int32,
 
 	fsType, err := detectFileSystemType(mountedPartition)
 	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
-		ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
+		_, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
 		if err == nil {
-			err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición lógica montada: %s", partitionName))
-			if err != nil {
-				fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
-			}
+			LogEXT3Operation(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición lógica montada: %s", partitionName))
 		}
 	}
 
@@ -538,12 +532,9 @@ func UNMOUNT(args []string) {
 
 	fsType, err := detectFileSystemType(MountedPartition)
 	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
-		ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(MountedPartition.Path, MountedPartition.Start)
+		_, err := EstructuraExt3P2.ReadEXT3FileSystem(MountedPartition.Path, MountedPartition.Start)
 		if err == nil {
-			err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_UNMOUNT, "/", fmt.Sprintf("Partición desmontada: %s", MountedPartition.Name))
-			if err != nil {
-				fmt.Printf("Advertencia: No se pudo registrar en el journal: %s\n", err)
-			}
+			LogEXT3Operation(EstructuraExt3P2.OPERATION_UNMOUNT, "/", fmt.Sprintf("Partición desmontada: %s", MountedPartition.Name))
 		}
 	}
 

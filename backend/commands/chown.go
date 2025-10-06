@@ -207,11 +207,7 @@ func chownInEXT3(partition MountedPartition, targetPath, newOwner string, recurs
 		return err
 	}
 
-	// Registrar la operación en el journal
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_CHOWN, targetPath, fmt.Sprintf("Nuevo propietario: %s", newOwner))
-	if err != nil {
-		fmt.Printf("Advertencia: No se pudo registrar la operación en el journal: %v\n", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHOWN, targetPath, fmt.Sprintf("Nuevo propietario: %s", newOwner))
 
 	return nil
 }

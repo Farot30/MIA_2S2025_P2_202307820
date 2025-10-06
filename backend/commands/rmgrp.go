@@ -195,10 +195,7 @@ func removeGroupEXT3(partition MountedPartition, groupName string) error {
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RMGRP, "users.txt", fmt.Sprintf("Grupo '%s' eliminado por '%s'", groupName, session.GetCurrentSession().Username))
-	if err != nil {
-		return fmt.Errorf("error añadiendo entrada al journal: %s", err)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_RMGRP, "users.txt", fmt.Sprintf("Grupo '%s' eliminado por '%s'", groupName, session.GetCurrentSession().Username))
 
 	return nil
 }

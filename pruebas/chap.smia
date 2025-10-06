@@ -9,7 +9,7 @@ fdisk -size=3 -path=disco1.smia -name=Part1 -unit=M
 # Montar la partición
 mount -path=disco1.smia -name=Part1
 
-mkfs -id=201A -type=full
+mkfs -id=201A -type=full -fs=3fs
 
 login -user=root -pass=123 -id=201A
 

@@ -171,26 +171,10 @@ func findInEXT3(partition MountedPartition, searchPath, searchName string, sessi
 		return nil, fmt.Errorf("no se pudo leer el sistema EXT3: %v", err)
 	}
 
-	// Registrar operación de búsqueda en el journal
-	searchInfo := fmt.Sprintf("path=%s name=%s user=%s", searchPath, searchName, sessionInfo.Username)
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, searchPath, "find_start: "+searchInfo)
-	if err != nil {
-		fmt.Printf("WARNING: No se pudo registrar inicio de búsqueda en journal: %v\n", err)
-	}
-
 	// Ejecutar búsqueda
 	results, err := executeFind(file, ext3fs.SuperBlock, searchPath, searchName, sessionInfo, ext3fs)
 
-	// Registrar resultado en journal
-	resultInfo := fmt.Sprintf("found %d items", len(results))
-	if err != nil {
-		resultInfo = "error: " + err.Error()
-	}
-
-	err2 := ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_RECOVERY, searchPath, "find_end: "+resultInfo)
-	if err2 != nil {
-		fmt.Printf("WARNING: No se pudo registrar fin de búsqueda en journal: %v\n", err2)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_FIND, searchPath, "")
 
 	return results, err
 }
@@ -310,12 +294,6 @@ func searchRecursively(file *os.File, superBlock *EstructuraarchivocarpetaP2.Sup
 						FullPath:    entryPath,
 					}
 					*results = append(*results, result)
-
-					// Registrar coincidencia en journal si es EXT3
-					if ext3fs != nil {
-						matchInfo := fmt.Sprintf("match: %s type=%s size=%d", entryPath, getEntryType(int32(entryInode.Itype)), entryInode.Is)
-						ext3fs.AddJournalEntry("find_match", entryPath, matchInfo)
-					}
 				}
 
 				// Si es directorio, buscar recursivamente
@@ -394,11 +372,6 @@ func searchInIndirectBlocks(file *os.File, superBlock *EstructuraarchivocarpetaP
 						FullPath:    entryPath,
 					}
 					*results = append(*results, result)
-
-					if ext3fs != nil {
-						matchInfo := fmt.Sprintf("match: %s type=%s size=%d", entryPath, getEntryType(int32(entryInode.Itype)), entryInode.Is)
-						ext3fs.AddJournalEntry("find_match", entryPath, matchInfo)
-					}
 				}
 
 				if entryInode.Itype == 0 {
