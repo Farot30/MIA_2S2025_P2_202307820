@@ -437,6 +437,7 @@ func startServer() {
 	})
 	http.HandleFunc("/filesystem/disks", commandsP2.HandleDisksAPI)
 	http.HandleFunc("/filesystem/content", commandsP2.HandleFileSystemContentAPI)
+	http.HandleFunc("/filesystem/file-content", commandsP2.HandleFileContentAPI)
 
 	http.HandleFunc("/debug/reports", func(w http.ResponseWriter, r *http.Request) {
 		enableCORS(w)

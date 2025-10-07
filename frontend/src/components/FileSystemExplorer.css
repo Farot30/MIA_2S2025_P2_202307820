@@ -37,15 +37,6 @@
   padding: 2rem;
 }
 
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 2rem;
-  text-align: center;
-}
-
 .error-message {
   background: #fee2e2;
   color: #dc2626;
@@ -53,6 +44,48 @@
   border-radius: 8px;
   margin-bottom: 1rem;
   border-left: 4px solid #dc2626;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-close {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* === LOADING STATES === */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #667eea;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 /* === DISK SELECTOR === */
@@ -64,48 +97,49 @@
 .selector-header {
   text-align: center;
   margin-bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
 }
 
 .selector-header h3 {
   font-size: 1.5rem;
   color: #333;
-  margin-bottom: 0.5rem;
+  margin: 0;
 }
 
 .selector-header p {
   color: #666;
   font-size: 1.1rem;
+  margin: 0;
+}
+
+.refresh-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.3s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #5a6fd8;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .disks-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
-}
-
-.no-disks {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 4rem 2rem;
-  background: #f8f9fa;
-  border-radius: 12px;
-  border: 2px dashed #dee2e6;
-}
-
-.no-disks-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
-
-.no-disks p {
-  font-size: 1.2rem;
-  color: #666;
-  margin-bottom: 0.5rem;
-}
-
-.no-disks small {
-  color: #999;
 }
 
 .disk-card {
@@ -172,7 +206,7 @@
 .disk-path {
   color: #666;
   font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   margin: 0 0 1rem 0;
   background: #f8f9fa;
   padding: 0.25rem 0.5rem;
@@ -181,13 +215,26 @@
 }
 
 .disk-stats {
-  margin-bottom: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
-.partition-count {
-  color: #667eea;
+.stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.stat-label {
+  color: #666;
   font-weight: 500;
-  font-size: 0.9rem;
+}
+
+.stat-value {
+  color: #333;
+  font-weight: 600;
 }
 
 .mounted-partitions {
@@ -205,6 +252,10 @@
   font-weight: 500;
 }
 
+.partition-badge.mounted {
+  background: #10b981;
+}
+
 .partition-badge.more {
   background: #94a3b8;
 }
@@ -219,6 +270,34 @@
   transform: translateX(5px);
 }
 
+/* === NO DISKS STATE === */
+.no-disks {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px dashed #dee2e6;
+}
+
+.no-disks-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.no-disks p {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.no-disks small {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+/* === SELECTOR INFO === */
 .selector-info {
   margin-top: 2rem;
 }
@@ -233,32 +312,222 @@
 .info-card h4 {
   margin: 0 0 1rem 0;
   color: #333;
+  font-size: 1.1rem;
 }
 
 .info-card ul {
   margin: 0;
   padding-left: 1.5rem;
+  color: #666;
 }
 
 .info-card li {
-  color: #666;
   margin-bottom: 0.5rem;
   line-height: 1.5;
 }
 
-/* === FILE SYSTEM VIEWER === */
-.filesystem-viewer {
+/* === PARTITION SELECTOR === */
+.partition-selector {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.partitions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.partition-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+}
+
+.partition-card.explorable {
+  cursor: pointer;
+}
+
+.partition-card.explorable:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+}
+
+.partition-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.partition-card.primaria {
+  border-left: 4px solid #3b82f6;
+}
+
+.partition-card.extendida {
+  border-left: 4px solid #8b5cf6;
+}
+
+.partition-card.lógica {
+  border-left: 4px solid #10b981;
+}
+
+.partition-icon {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.partition-image {
+  font-size: 2.5rem;
+}
+
+.mounted-indicator {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  font-size: 1rem;
+  background: #10b981;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.partition-info {
+  flex: 1;
+}
+
+.partition-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.partition-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat-value.mounted {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.stat-value.unmounted {
+  color: #ef4444;
+}
+
+.stat-value.current-session {
+  color: #667eea;
+  font-weight: 700;
+}
+
+.partition-warning {
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #fef3c7;
+  color: #d97706;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.partition-arrow {
+  font-size: 1.2rem;
+  color: #667eea;
+  transition: transform 0.3s ease;
+}
+
+.partition-card.explorable:hover .partition-arrow {
+  transform: translateX(3px);
+}
+
+/* === NO PARTITIONS STATE === */
+.no-partitions {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px dashed #dee2e6;
+}
+
+.no-partitions-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.no-partitions p {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.no-partitions small {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.disk-summary {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border-left: 4px solid #667eea;
+}
+
+.disk-summary h4 {
+  margin: 0 0 1rem 0;
+  color: #333;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.summary-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+}
+
+/* === FILE SYSTEM NAVIGATOR === */
+.filesystem-navigator {
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.viewer-header {
+.navigator-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 2px solid #e5e7eb;
+}
+
+.navigator-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.navigator-controls {
+  display: flex;
+  gap: 1rem;
 }
 
 .back-btn {
@@ -277,25 +546,27 @@
   transform: translateY(-2px);
 }
 
-.current-disk {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
+.partition-info-bar {
+  background: #f0f4f8;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid #667eea;
 }
 
-.disk-name {
-  font-size: 1.2rem;
+.partition-details {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.partition-name {
   font-weight: 600;
   color: #333;
 }
 
-.current-path {
-  font-family: 'Monaco', 'Menlo', monospace;
-  color: #667eea;
-  background: #f0f4f8;
-  padding: 0.25rem 0.75rem;
-  border-radius: 6px;
+.partition-type, .partition-id {
+  color: #666;
   font-size: 0.9rem;
 }
 
@@ -340,13 +611,7 @@
   font-size: 0.9rem;
 }
 
-.breadcrumb-item {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.breadcrumb-link {
+.breadcrumb-root, .breadcrumb-link {
   color: #667eea;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
@@ -354,7 +619,7 @@
   transition: background 0.2s ease;
 }
 
-.breadcrumb-link:hover {
+.breadcrumb-root:hover, .breadcrumb-link:hover {
   background: rgba(102, 126, 234, 0.1);
 }
 
@@ -363,8 +628,37 @@
   margin: 0 0.25rem;
 }
 
-.directory-content {
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+}
+
+.content-area {
   min-height: 400px;
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.content-header h4 {
+  margin: 0;
+  color: #333;
+}
+
+.item-count {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.directory-content {
+  width: 100%;
 }
 
 .items-grid {
@@ -373,15 +667,7 @@
   gap: 1rem;
 }
 
-.empty-directory {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 4rem 2rem;
-  color: #666;
-  font-size: 1.1rem;
-}
-
-.directory-item {
+.filesystem-item {
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -393,17 +679,17 @@
   gap: 1rem;
 }
 
-.directory-item:hover {
+.filesystem-item:hover {
   border-color: #667eea;
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
 }
 
-.directory-item.directory {
+.filesystem-item.directory {
   background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
 }
 
-.directory-item.file {
+.filesystem-item.file {
   background: #fafafa;
 }
 
@@ -452,114 +738,275 @@
   transition: transform 0.3s ease;
 }
 
-.directory-item:hover .item-arrow {
+.filesystem-item:hover .item-arrow {
   transform: translateX(3px);
 }
 
-.error-state {
+/* === EMPTY DIRECTORY === */
+.empty-directory {
+  grid-column: 1 / -1;
   text-align: center;
-  padding: 2rem;
-  color: #dc2626;
+  padding: 3rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px dashed #dee2e6;
+  color: #666;
 }
 
-.error-state button {
-  background: #dc2626;
+.empty-directory p {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+/* === FILE CONTENT MODAL === */
+.file-content-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-header h4 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
+  color: white;
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   cursor: pointer;
-  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.3s ease;
 }
 
-.error-state button:hover {
-  background: #b91c1c;
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-/* === RESPONSIVE === */
-@media (max-width: 1024px) {
+.modal-body {
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.file-info {
+  background: #f8f9fa;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.file-info span {
+  font-size: 0.9rem;
+  color: #666;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.file-content {
+  flex: 1;
+  overflow: auto;
+  padding: 1.5rem;
+  min-height: 200px;
+  max-height: 60vh;
+}
+
+.file-content pre {
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #333;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+/* === RESPONSIVE DESIGN === */
+@media (max-width: 768px) {
+  .explorer-container {
+    margin: 0.5rem;
+    border-radius: 10px;
+  }
+
+  .explorer-header {
+    padding: 1.5rem;
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
   .explorer-content {
     padding: 1rem;
   }
-  
-  .disks-grid {
+
+  .disks-grid, .partitions-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .disk-card, .partition-card {
+    padding: 1rem;
+  }
+
+  .disk-stats, .summary-stats {
     grid-template-columns: 1fr;
   }
-  
+
+  .navigator-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .navigation-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .path-breadcrumb {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
   .items-grid {
     grid-template-columns: 1fr;
   }
-  
-  .viewer-header {
+
+  .modal-content {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .file-info {
     flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
+    gap: 0.5rem;
   }
-  
-  .current-disk {
-    align-items: flex-start;
+
+  .file-content {
+    padding: 1rem;
   }
 }
 
-@media (max-width: 768px) {
-  .explorer-header {
+@media (max-width: 480px) {
+  .explorer-header h2 {
+    font-size: 1.4rem;
+  }
+
+  .session-badge {
+    font-size: 0.8rem;
+  }
+
+  .disk-info h4, .partition-info h4 {
+    font-size: 1.1rem;
+  }
+
+  .filesystem-item {
+    padding: 0.75rem;
+  }
+
+  .item-details {
     flex-direction: column;
-    gap: 1rem;
-    text-align: center;
+    gap: 0.25rem;
   }
-  
-  .navigation-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .path-breadcrumb {
-    justify-content: center;
-  }
-  
-  .disk-card {
-    flex-direction: column;
-    text-align: center;
-  }
-  
-  .disk-arrow {
-    transform: rotate(90deg);
-  }
-  
-  .disk-card:hover .disk-arrow {
-    transform: rotate(90deg) translateX(3px);
+
+  .nav-btn, .back-btn, .refresh-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
   }
 }
 
-/* === ANIMATIONS === */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+/* === ACCESSIBILITY === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .spinner {
+    animation: none;
   }
 }
 
-.directory-item,
-.disk-card {
-  animation: fadeIn 0.3s ease-out;
+/* Focus styles for keyboard navigation */
+.disk-card:focus,
+.partition-card:focus,
+.filesystem-item:focus,
+.nav-btn:focus,
+.back-btn:focus,
+.refresh-btn:focus,
+.close-btn:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .disk-card,
+  .partition-card,
+  .filesystem-item {
+    border-width: 3px;
+  }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  .error-message {
+    border-width: 3px;
+  }
 }

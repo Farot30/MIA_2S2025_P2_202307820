@@ -10,7 +10,10 @@ const FileSystemExplorer = ({ session }) => {
   const [directoryContent, setDirectoryContent] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [fileContent, setFileContent] = useState(null);
+  
+  // Estados para el modal de archivos
+  const [viewingFile, setViewingFile] = useState(null);
+  const [fileContentLoading, setFileContentLoading] = useState(false);
 
   // Cargar discos al montar el componente
   useEffect(() => {
@@ -109,24 +112,32 @@ const FileSystemExplorer = ({ session }) => {
 
   const loadFileContent = async (file) => {
     try {
-      setLoading(true);
+      setFileContentLoading(true);
+      setError('');
       
-      const url = `http://localhost:8080/filesystem/content?partition_id=${selectedPartition.mounted_id}&path=${encodeURIComponent(file.path)}&show_content=true`;
+      // Usar el nuevo endpoint que utiliza CAT
+      const url = `http://localhost:8080/filesystem/file-content?partition_id=${selectedPartition.mounted_id}&file_path=${encodeURIComponent(file.path)}`;
       const resp = await fetch(url);
       
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.success && data.items.length > 0) {
-          setFileContent({
-            ...file,
-            content: data.items[0].content || 'Archivo vacío'
-          });
-        }
+      if (!resp.ok) {
+        throw new Error(`Error ${resp.status}: ${resp.statusText}`);
+      }
+
+      const data = await resp.json();
+      if (data.success) {
+        setViewingFile({
+          ...file,
+          content: data.content,
+          fileInfo: data.fileInfo
+        });
+      } else {
+        setError(data.error || 'Error cargando contenido del archivo');
       }
     } catch (err) {
+      setError(`Error cargando archivo: ${err.message}`);
       console.error('Error cargando archivo:', err);
     } finally {
-      setLoading(false);
+      setFileContentLoading(false);
     }
   };
 
@@ -143,7 +154,7 @@ const FileSystemExplorer = ({ session }) => {
       setStep(2);
       setCurrentPath('/');
       setDirectoryContent([]);
-      setFileContent(null);
+      setViewingFile(null); // Cambié de setFileContent a setViewingFile
     } else if (step === 2) {
       setStep(1);
       setSelectedDisk(null);
@@ -209,11 +220,20 @@ const FileSystemExplorer = ({ session }) => {
             onBackToParent={handleBackToParent}
             onRefresh={() => loadDirectoryContent(currentPath)}
             loading={loading}
-            fileContent={fileContent}
-            onCloseFile={() => setFileContent(null)}
+            viewingFile={viewingFile} // Cambié de fileContent a viewingFile
+            onCloseFile={() => setViewingFile(null)} // Cambié de setFileContent a setViewingFile
           />
         )}
       </div>
+
+      {/* Modal de contenido de archivo - movido aquí para estar disponible globalmente */}
+      {viewingFile && (
+        <FileContentModal 
+          file={viewingFile}
+          onClose={() => setViewingFile(null)}
+          loading={fileContentLoading}
+        />
+      )}
     </div>
   );
 };
@@ -492,7 +512,7 @@ const FileSystemNavigator = ({
   onBackToParent,
   onRefresh,
   loading,
-  fileContent,
+  viewingFile, // Cambié de fileContent a viewingFile
   onCloseFile
 }) => {
   return (
@@ -585,12 +605,7 @@ const FileSystemNavigator = ({
         )}
       </div>
 
-      {fileContent && (
-        <FileContentModal 
-          file={fileContent}
-          onClose={onCloseFile}
-        />
-      )}
+      {/* Eliminé el modal de aquí ya que ahora está en el componente principal */}
     </div>
   );
 };
@@ -633,8 +648,48 @@ const FileSystemItem = ({ item, onClick }) => {
   );
 };
 
-// Componente para mostrar contenido de archivos
-const FileContentModal = ({ file, onClose }) => {
+// Componente para mostrar contenido de archivos - MEJORADO
+const FileContentModal = ({ file, onClose, loading }) => {
+  const formatSize = (bytes) => {
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    } else if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`;
+    }
+    return `${bytes} B`;
+  };
+
+  const isTextFile = (filename) => {
+    const textExtensions = ['.txt', '.md', '.json', '.xml', '.html', '.css', '.js', '.py', '.java', '.c', '.cpp', '.h'];
+    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    return textExtensions.includes(ext) || !filename.includes('.');
+  };
+
+  const isBinaryFile = (content) => {
+    // Detectar si el contenido es binario
+    return /[\x00-\x08\x0E-\x1F\x7F]/.test(content);
+  };
+
+  if (loading) {
+    return (
+      <div className="file-content-modal">
+        <div className="modal-backdrop" onClick={onClose}></div>
+        <div className="modal-content">
+          <div className="modal-header">
+            <h4>📄 Cargando...</h4>
+            <button onClick={onClose} className="close-btn">✕</button>
+          </div>
+          <div className="modal-body">
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Cargando contenido del archivo...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="file-content-modal">
       <div className="modal-backdrop" onClick={onClose}></div>
@@ -645,12 +700,68 @@ const FileContentModal = ({ file, onClose }) => {
         </div>
         <div className="modal-body">
           <div className="file-info">
-            <span>Tamaño: {file.size} bytes</span>
-            <span>Permisos: {file.permissions}</span>
-            <span>Propietario: {file.owner}:{file.group}</span>
+            <span>📏 Tamaño: {formatSize(file.size)}</span>
+            <span>🔒 Permisos: {file.permissions}</span>
+            <span>👤 Propietario: {file.owner}:{file.group}</span>
+            <span>📍 Ruta: {file.path}</span>
           </div>
           <div className="file-content">
-            <pre>{file.content}</pre>
+            {!file.content ? (
+              <div className="empty-file">
+                <p>📭 Archivo vacío</p>
+              </div>
+            ) : isBinaryFile(file.content) ? (
+              <div className="binary-file">
+                <p>🔒 Archivo binario</p>
+                <p>Este archivo contiene datos binarios que no se pueden mostrar como texto.</p>
+                <div className="file-preview">
+                  <h5>Vista hexadecimal (primeros 256 bytes):</h5>
+                  <pre className="hex-preview">
+                    {file.content.substring(0, 256)
+                      .split('')
+                      .map((char, idx) => {
+                        if (idx % 16 === 0) return '\n';
+                        return char.charCodeAt(0).toString(16).padStart(2, '0') + ' ';
+                      })
+                      .join('')
+                    }
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              <div className="text-file">
+                <div className="content-stats">
+                  <span>📝 Líneas: {file.content.split('\n').length}</span>
+                  <span>🔤 Caracteres: {file.content.length}</span>
+                  <span>📊 Tipo: {isTextFile(file.name) ? 'Texto' : 'Desconocido'}</span>
+                </div>
+                <pre className="file-text-content">{file.content}</pre>
+              </div>
+            )}
+          </div>
+          <div className="file-actions">
+            <button 
+              className="action-btn" 
+              onClick={() => navigator.clipboard.writeText(file.content)}
+              disabled={!file.content || isBinaryFile(file.content)}
+            >
+              📋 Copiar contenido
+            </button>
+            <button 
+              className="action-btn secondary" 
+              onClick={() => {
+                const blob = new Blob([file.content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              disabled={!file.content}
+            >
+              💾 Descargar
+            </button>
           </div>
         </div>
       </div>
