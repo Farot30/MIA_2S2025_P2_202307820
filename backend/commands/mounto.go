@@ -23,6 +23,8 @@ type MountedPartition struct {
 	Type   string // Tipo de partición (Primaria, Lógica, Extendida)
 }
 
+var mountedPartitionsMutex sync.RWMutex
+
 // MountManager maneja todas las particiones montadas
 type MountManager struct {
 	mutex             sync.RWMutex

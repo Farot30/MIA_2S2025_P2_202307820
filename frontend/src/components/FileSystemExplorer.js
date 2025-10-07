@@ -1,115 +1,157 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import './FileSystemExplorer.css';
 
 const FileSystemExplorer = ({ session }) => {
+  const [step, setStep] = useState(1); // 1: discos, 2: particiones, 3: navegación
   const [availableDisks, setAvailableDisks] = useState([]);
-  const [selectedDisk, setSelectedDisk] = useState('');
-  const [mountedPartitions, setMountedPartitions] = useState([]);
+  const [selectedDisk, setSelectedDisk] = useState(null);
+  const [selectedPartition, setSelectedPartition] = useState(null);
+  const [currentPath, setCurrentPath] = useState('/');
+  const [directoryContent, setDirectoryContent] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fileContent, setFileContent] = useState(null);
 
-  // Cargar discos disponibles al montar el componente
+  // Cargar discos al montar el componente
   useEffect(() => {
     loadAvailableDisks();
-    loadMountedPartitions();
   }, []);
-
-  
 
   const loadAvailableDisks = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      // Obtener lista de discos montados para inferir qué discos existen
-      const resp = await fetch('http://localhost:8080/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commands: 'mounted' })
-      });
+      const resp = await fetch('http://localhost:8080/filesystem/disks');
+      if (!resp.ok) {
+        throw new Error(`Error ${resp.status}: ${resp.statusText}`);
+      }
 
-      if (resp.ok) {
-        const json = await resp.json();
-        
-        // Extraer información de discos del output
-        const disks = extractDisksFromMountedOutput(json.output);
-        setAvailableDisks(disks);
+      const data = await resp.json();
+      if (data.success) {
+        setAvailableDisks(data.disks || []);
+      } else {
+        setError('Error cargando información de discos');
       }
     } catch (err) {
-      setError('Error cargando discos disponibles');
-      console.error(err);
+      setError(`Error de conexión: ${err.message}`);
+      console.error('Error cargando discos:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadMountedPartitions = async () => {
-    try {
-      const resp = await fetch('http://localhost:8080/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commands: 'mounted' })
-      });
-
-      if (resp.ok) {
-        const json = await resp.json();
-        const partitions = extractPartitionsFromMountedOutput(json.output);
-        setMountedPartitions(partitions);
-      }
-    } catch (err) {
-      console.error('Error cargando particiones montadas:', err);
-    }
-  };
-
-  const extractDisksFromMountedOutput = (output) => {
-    const disks = [];
-    const lines = output.split('\n');
-    
-    for (const line of lines) {
-      // Buscar líneas que contengan rutas de archivos .mia
-      const diskMatch = line.match(/([A-Za-z]:[\\\/][^|]+\.mia|\/[^|]+\.mia)/);
-      if (diskMatch) {
-        const diskPath = diskMatch[1];
-        const diskName = diskPath.split(/[\\\/]/).pop().replace('.mia', '');
-        
-        if (!disks.find(d => d.path === diskPath)) {
-          disks.push({
-            name: diskName,
-            path: diskPath,
-            fullPath: diskPath
-          });
-        }
-      }
-    }
-    
-    return disks;
-  };
-
-  const extractPartitionsFromMountedOutput = (output) => {
-    const partitions = [];
-    const lines = output.split('\n');
-    
-    for (const line of lines) {
-      // Extraer información de particiones montadas
-      const partitionMatch = line.match(/([A-Z0-9]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)/);
-      if (partitionMatch) {
-        partitions.push({
-          id: partitionMatch[1].trim(),
-          name: partitionMatch[2].trim(),
-          path: partitionMatch[3].trim(),
-          type: partitionMatch[4].trim()
-        });
-      }
-    }
-    
-    return partitions;
-  };
-
   const handleDiskSelect = (disk) => {
     setSelectedDisk(disk);
+    setSelectedPartition(null);
+    setStep(2);
     setError('');
   };
 
-  if (loading) {
+  const handlePartitionSelect = (partition) => {
+    if (!partition.is_mounted) {
+      setError('La partición debe estar montada para ser explorada');
+      return;
+    }
+
+    if (session.id !== partition.mounted_id) {
+      setError('Debe iniciar sesión en esta partición para explorarla');
+      return;
+    }
+
+    setSelectedPartition(partition);
+    setCurrentPath('/');
+    setStep(3);
+    setError('');
+    loadDirectoryContent('/', partition.mounted_id);
+  };
+
+  const loadDirectoryContent = async (path, partitionID = null) => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const pid = partitionID || selectedPartition?.mounted_id;
+      if (!pid) {
+        throw new Error('No hay partición seleccionada');
+      }
+
+      const url = `http://localhost:8080/filesystem/content?partition_id=${pid}&path=${encodeURIComponent(path)}`;
+      const resp = await fetch(url);
+      
+      if (!resp.ok) {
+        throw new Error(`Error ${resp.status}: ${resp.statusText}`);
+      }
+
+      const data = await resp.json();
+      if (data.success) {
+        setDirectoryContent(data.items || []);
+        setCurrentPath(path);
+      } else {
+        setError(data.error || 'Error cargando contenido del directorio');
+      }
+    } catch (err) {
+      setError(`Error cargando directorio: ${err.message}`);
+      console.error('Error cargando directorio:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleItemClick = (item) => {
+    if (item.is_directory) {
+      loadDirectoryContent(item.path);
+    } else {
+      // Mostrar contenido del archivo
+      loadFileContent(item);
+    }
+  };
+
+  const loadFileContent = async (file) => {
+    try {
+      setLoading(true);
+      
+      const url = `http://localhost:8080/filesystem/content?partition_id=${selectedPartition.mounted_id}&path=${encodeURIComponent(file.path)}&show_content=true`;
+      const resp = await fetch(url);
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && data.items.length > 0) {
+          setFileContent({
+            ...file,
+            content: data.items[0].content || 'Archivo vacío'
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando archivo:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToParent = () => {
+    if (currentPath !== '/') {
+      const parts = currentPath.split('/').filter(p => p);
+      const parentPath = parts.length <= 1 ? '/' : '/' + parts.slice(0, -1).join('/');
+      loadDirectoryContent(parentPath);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 3) {
+      setStep(2);
+      setCurrentPath('/');
+      setDirectoryContent([]);
+      setFileContent(null);
+    } else if (step === 2) {
+      setStep(1);
+      setSelectedDisk(null);
+      setSelectedPartition(null);
+    }
+  };
+
+  if (loading && step === 1) {
     return (
       <div className="explorer-container">
         <div className="loading-state">
@@ -134,22 +176,41 @@ const FileSystemExplorer = ({ session }) => {
       {error && (
         <div className="error-message">
           <span>⚠️ {error}</span>
+          <button onClick={() => setError('')} className="error-close">✕</button>
         </div>
       )}
 
       <div className="explorer-content">
-        {!selectedDisk ? (
+        {step === 1 && (
           <DiskSelector 
             disks={availableDisks}
             onDiskSelect={handleDiskSelect}
-            mountedPartitions={mountedPartitions}
+            onRefresh={loadAvailableDisks}
+            loading={loading}
           />
-        ) : (
-          <FileSystemViewer 
+        )}
+
+        {step === 2 && selectedDisk && (
+          <PartitionSelector 
             disk={selectedDisk}
-            session={session}
-            onBack={() => setSelectedDisk('')}
-            mountedPartitions={mountedPartitions}
+            onPartitionSelect={handlePartitionSelect}
+            onBack={handleBack}
+            currentSession={session}
+          />
+        )}
+
+        {step === 3 && selectedPartition && (
+          <FileSystemNavigator 
+            partition={selectedPartition}
+            currentPath={currentPath}
+            directoryContent={directoryContent}
+            onItemClick={handleItemClick}
+            onBack={handleBack}
+            onBackToParent={handleBackToParent}
+            onRefresh={() => loadDirectoryContent(currentPath)}
+            loading={loading}
+            fileContent={fileContent}
+            onCloseFile={() => setFileContent(null)}
           />
         )}
       </div>
@@ -157,13 +218,16 @@ const FileSystemExplorer = ({ session }) => {
   );
 };
 
-// Componente para seleccionar disco
-const DiskSelector = ({ disks, onDiskSelect, mountedPartitions }) => {
+// Componente 1: Selector de Discos
+const DiskSelector = ({ disks, onDiskSelect, onRefresh, loading }) => {
   return (
     <div className="disk-selector">
       <div className="selector-header">
-        <h3>Seleccione el disco que desea visualizar:</h3>
-        <p>Los discos disponibles se muestran a continuación</p>
+        <h3>1. Selección de Disco</h3>
+        <p>Seleccione el disco que desea explorar</p>
+        <button onClick={onRefresh} className="refresh-btn" disabled={loading}>
+          🔄 Actualizar
+        </button>
       </div>
 
       <div className="disks-grid">
@@ -179,7 +243,6 @@ const DiskSelector = ({ disks, onDiskSelect, mountedPartitions }) => {
               key={index}
               disk={disk}
               onClick={() => onDiskSelect(disk)}
-              mountedPartitions={mountedPartitions.filter(p => p.path.includes(disk.name))}
             />
           ))
         )}
@@ -189,9 +252,9 @@ const DiskSelector = ({ disks, onDiskSelect, mountedPartitions }) => {
         <div className="info-card">
           <h4>ℹ️ Información</h4>
           <ul>
-            <li>Seleccione un disco para explorar su contenido</li>
-            <li>Solo se mostrarán los discos que tienen particiones montadas</li>
-            <li>El explorador es de solo lectura</li>
+            <li>Los discos muestran información básica como capacidad y fit</li>
+            <li>Se indica el número de particiones montadas</li>
+            <li>Solo se pueden explorar particiones montadas y formateadas</li>
           </ul>
         </div>
       </div>
@@ -199,8 +262,28 @@ const DiskSelector = ({ disks, onDiskSelect, mountedPartitions }) => {
   );
 };
 
-// Componente para mostrar cada disco
-const DiskCard = ({ disk, onClick, mountedPartitions }) => {
+// Componente para mostrar tarjeta de disco
+const DiskCard = ({ disk, onClick }) => {
+  const formatSize = (bytes) => {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    } else if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    } else if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${bytes} B`;
+  };
+
+  const getFitName = (fit) => {
+    const fitNames = {
+      'F': 'First Fit',
+      'B': 'Best Fit', 
+      'W': 'Worst Fit'
+    };
+    return fitNames[fit] || fit;
+  };
+
   return (
     <div className="disk-card" onClick={onClick}>
       <div className="disk-icon">
@@ -208,21 +291,39 @@ const DiskCard = ({ disk, onClick, mountedPartitions }) => {
       </div>
       <div className="disk-info">
         <h4>{disk.name}</h4>
-        <p className="disk-path">{disk.fullPath}</p>
+        <p className="disk-path">{disk.path}</p>
+        
         <div className="disk-stats">
-          <span className="partition-count">
-            🏷️ {mountedPartitions.length} particion{mountedPartitions.length !== 1 ? 'es' : ''}
-          </span>
+          <div className="stat">
+            <span className="stat-label">Tamaño:</span>
+            <span className="stat-value">{formatSize(disk.size)}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Ajuste:</span>
+            <span className="stat-value">{getFitName(disk.fit)}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Particiones:</span>
+            <span className="stat-value">{disk.partitions.length}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Montadas:</span>
+            <span className="stat-value">{disk.mounted_count}</span>
+          </div>
         </div>
-        {mountedPartitions.length > 0 && (
+
+        {disk.mounted_count > 0 && (
           <div className="mounted-partitions">
-            {mountedPartitions.slice(0, 3).map((partition, idx) => (
-              <span key={idx} className="partition-badge">
-                {partition.id}
-              </span>
-            ))}
-            {mountedPartitions.length > 3 && (
-              <span className="partition-badge more">+{mountedPartitions.length - 3}</span>
+            {disk.partitions
+              .filter(p => p.is_mounted)
+              .slice(0, 3)
+              .map((partition, idx) => (
+                <span key={idx} className="partition-badge mounted">
+                  {partition.mounted_id}
+                </span>
+              ))}
+            {disk.mounted_count > 3 && (
+              <span className="partition-badge more">+{disk.mounted_count - 3}</span>
             )}
           </div>
         )}
@@ -232,179 +333,292 @@ const DiskCard = ({ disk, onClick, mountedPartitions }) => {
   );
 };
 
-// Componente para visualizar el sistema de archivos del disco seleccionado
-const FileSystemViewer = ({ disk, session, onBack, mountedPartitions }) => {
-  const [currentPath, setCurrentPath] = useState('/');
-  const [directoryContent, setDirectoryContent] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    loadDirectoryContent('/');
-  }, []);
-
-  const loadDirectoryContent = async (path) => {
-    try {
-      setLoading(true);
-      setError('');
-
-      // Usar comando ls para obtener el contenido del directorio
-      const lsCommand = `ls -path="${path}"`;
-      const resp = await fetch('http://localhost:8080/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commands: lsCommand })
-      });
-
-      if (resp.ok) {
-        const json = await resp.json();
-        const content = parseDirectoryContent(json.output);
-        setDirectoryContent(content);
-        setCurrentPath(path);
-      } else {
-        setError('Error cargando contenido del directorio');
-      }
-    } catch (err) {
-      setError('Error de conexión');
-      console.error(err);
-    } finally {
-      setLoading(false);
+// Componente 2: Selector de Particiones
+const PartitionSelector = ({ disk, onPartitionSelect, onBack, currentSession }) => {
+  const formatSize = (bytes) => {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    } else if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    } else if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
     }
-  };
-
-  const parseDirectoryContent = (output) => {
-    // Parsear el output del comando ls
-    const lines = output.split('\n');
-    const content = [];
-
-    for (const line of lines) {
-      // Buscar patrones de archivos y directorios
-      const match = line.match(/([drwx-]{10})\s+(\w+)\s+(\w+)\s+(\d+)\s+(.+)/);
-      if (match) {
-        const [, permissions, owner, group, size, name] = match;
-        content.push({
-          name: name.trim(),
-          isDirectory: permissions.startsWith('d'),
-          permissions,
-          owner,
-          group,
-          size: parseInt(size),
-          fullPath: currentPath === '/' ? `/${name.trim()}` : `${currentPath}/${name.trim()}`
-        });
-      }
-    }
-
-    return content;
-  };
-
-  const handleItemClick = (item) => {
-    if (item.isDirectory) {
-      loadDirectoryContent(item.fullPath);
-    }
-  };
-
-  const handleBackToParent = () => {
-    if (currentPath !== '/') {
-      const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
-      loadDirectoryContent(parentPath);
-    }
+    return `${bytes} B`;
   };
 
   return (
-    <div className="filesystem-viewer">
-      <div className="viewer-header">
-        <button className="back-btn" onClick={onBack}>
-          ← Volver a selección de discos
+    <div className="partition-selector">
+      <div className="selector-header">
+        <h3>2. Selección de Partición</h3>
+        <p>Seleccione la partición que desea explorar en el disco <strong>{disk.name}</strong></p>
+        <button onClick={onBack} className="back-btn">
+          ← Volver a discos
         </button>
-        <div className="current-disk">
-          <span className="disk-name">💾 {disk.name}</span>
-          <span className="current-path">📂 {currentPath}</span>
+      </div>
+
+      <div className="partitions-grid">
+        {disk.partitions.length === 0 ? (
+          <div className="no-partitions">
+            <div className="no-partitions-icon">🗂️</div>
+            <p>No se encontraron particiones en este disco</p>
+            <small>Cree particiones usando el comando fdisk</small>
+          </div>
+        ) : (
+          disk.partitions.map((partition, index) => (
+            <PartitionCard 
+              key={index}
+              partition={partition}
+              onClick={() => onPartitionSelect(partition)}
+              currentSession={currentSession}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="disk-summary">
+        <h4>📊 Resumen del Disco</h4>
+        <div className="summary-stats">
+          <div className="summary-stat">
+            <span>Tamaño Total:</span>
+            <span>{formatSize(disk.size)}</span>
+          </div>
+          <div className="summary-stat">
+            <span>Particiones:</span>
+            <span>{disk.partitions.length}</span>
+          </div>
+          <div className="summary-stat">
+            <span>Montadas:</span>
+            <span>{disk.mounted_count}</span>
+          </div>
+          <div className="summary-stat">
+            <span>Ajuste:</span>
+            <span>{disk.fit}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Componente para mostrar tarjeta de partición
+const PartitionCard = ({ partition, onClick, currentSession }) => {
+  const formatSize = (bytes) => {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    } else if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    } else if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${bytes} B`;
+  };
+
+  const canExplore = partition.is_mounted && partition.mounted_id === currentSession.id;
+  const isCurrentSession = partition.mounted_id === currentSession.id;
+
+  return (
+    <div 
+      className={`partition-card ${partition.type.toLowerCase()} ${canExplore ? 'explorable' : 'disabled'}`}
+      onClick={canExplore ? onClick : undefined}
+    >
+      <div className="partition-icon">
+        <div className="partition-image">
+          {partition.type === 'Primaria' && '🗂️'}
+          {partition.type === 'Extendida' && '📂'}
+          {partition.type === 'Lógica' && '📄'}
+        </div>
+        {partition.is_mounted && (
+          <div className="mounted-indicator">🔗</div>
+        )}
+      </div>
+      
+      <div className="partition-info">
+        <h4>{partition.name}</h4>
+        <div className="partition-stats">
+          <div className="stat">
+            <span className="stat-label">Tipo:</span>
+            <span className="stat-value">{partition.type}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Tamaño:</span>
+            <span className="stat-value">{formatSize(partition.size)}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Estado:</span>
+            <span className={`stat-value ${partition.is_mounted ? 'mounted' : 'unmounted'}`}>
+              {partition.is_mounted ? 'Montada' : 'No montada'}
+            </span>
+          </div>
+          {partition.is_mounted && (
+            <div className="stat">
+              <span className="stat-label">ID:</span>
+              <span className={`stat-value ${isCurrentSession ? 'current-session' : ''}`}>
+                {partition.mounted_id}
+              </span>
+            </div>
+          )}
+          {partition.file_system && (
+            <div className="stat">
+              <span className="stat-label">Sistema:</span>
+              <span className="stat-value">{partition.file_system}</span>
+            </div>
+          )}
+        </div>
+
+        {!canExplore && (
+          <div className="partition-warning">
+            {!partition.is_mounted ? 
+              '⚠️ Partición no montada' : 
+              '⚠️ Inicie sesión en esta partición'
+            }
+          </div>
+        )}
+      </div>
+      
+      {canExplore && (
+        <div className="partition-arrow">→</div>
+      )}
+    </div>
+  );
+};
+
+// Componente 3: Navegador del Sistema de Archivos
+const FileSystemNavigator = ({ 
+  partition, 
+  currentPath, 
+  directoryContent, 
+  onItemClick, 
+  onBack, 
+  onBackToParent,
+  onRefresh,
+  loading,
+  fileContent,
+  onCloseFile
+}) => {
+  return (
+    <div className="filesystem-navigator">
+      <div className="navigator-header">
+        <h3>3. Navegación del Sistema de Archivos</h3>
+        <div className="navigator-controls">
+          <button onClick={onBack} className="back-btn">
+            ← Volver a particiones
+          </button>
+          <button onClick={onRefresh} className="refresh-btn" disabled={loading}>
+            🔄 Actualizar
+          </button>
+        </div>
+      </div>
+
+      <div className="partition-info-bar">
+        <div className="partition-details">
+          <span className="partition-name">📂 {partition.name}</span>
+          <span className="partition-type">({partition.type})</span>
+          <span className="partition-id">ID: {partition.mounted_id}</span>
         </div>
       </div>
 
       <div className="navigation-bar">
         <button 
           className="nav-btn"
-          onClick={() => loadDirectoryContent('/')}
+          onClick={() => onItemClick({ path: '/', is_directory: true })}
           disabled={currentPath === '/'}
         >
           🏠 Raíz
         </button>
         <button 
           className="nav-btn"
-          onClick={handleBackToParent}
+          onClick={onBackToParent}
           disabled={currentPath === '/'}
         >
           ↩️ Subir
         </button>
         <div className="path-breadcrumb">
-          {currentPath.split('/').filter(p => p).map((part, idx, arr) => (
+          <span className="breadcrumb-root" onClick={() => onItemClick({ path: '/', is_directory: true })}>
+            /
+          </span>
+          {currentPath !== '/' && currentPath.split('/').filter(p => p).map((part, idx, arr) => (
             <span key={idx} className="breadcrumb-item">
+              <span className="breadcrumb-separator">/</span>
               <span 
                 className="breadcrumb-link"
                 onClick={() => {
                   const path = '/' + arr.slice(0, idx + 1).join('/');
-                  loadDirectoryContent(path);
+                  onItemClick({ path, is_directory: true });
                 }}
               >
                 {part}
               </span>
-              {idx < arr.length - 1 && <span className="breadcrumb-separator">/</span>}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="directory-content">
+      <div className="content-area">
         {loading ? (
           <div className="loading-state">
             <div className="spinner"></div>
             <p>Cargando contenido...</p>
           </div>
-        ) : error ? (
-          <div className="error-state">
-            <p>⚠️ {error}</p>
-            <button onClick={() => loadDirectoryContent(currentPath)}>
-              🔄 Reintentar
-            </button>
-          </div>
         ) : (
-          <div className="items-grid">
-            {directoryContent.length === 0 ? (
-              <div className="empty-directory">
-                <p>📭 Directorio vacío</p>
-              </div>
-            ) : (
-              directoryContent.map((item, index) => (
-                <DirectoryItem 
-                  key={index}
-                  item={item}
-                  onClick={() => handleItemClick(item)}
-                />
-              ))
-            )}
+          <div className="directory-content">
+            <div className="content-header">
+              <h4>📁 {currentPath}</h4>
+              <span className="item-count">{directoryContent.length} elementos</span>
+            </div>
+            
+            <div className="items-grid">
+              {directoryContent.length === 0 ? (
+                <div className="empty-directory">
+                  <p>📭 Directorio vacío</p>
+                </div>
+              ) : (
+                directoryContent.map((item, index) => (
+                  <FileSystemItem 
+                    key={index}
+                    item={item}
+                    onClick={() => onItemClick(item)}
+                  />
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>
+
+      {fileContent && (
+        <FileContentModal 
+          file={fileContent}
+          onClose={onCloseFile}
+        />
+      )}
     </div>
   );
 };
 
-// Componente para mostrar elementos del directorio
-const DirectoryItem = ({ item, onClick }) => {
+// Componente para mostrar elementos del sistema de archivos
+const FileSystemItem = ({ item, onClick }) => {
+  const formatSize = (bytes) => {
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    } else if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${bytes} B`;
+  };
+
   return (
     <div 
-      className={`directory-item ${item.isDirectory ? 'directory' : 'file'}`}
+      className={`filesystem-item ${item.is_directory ? 'directory' : 'file'}`}
       onClick={onClick}
     >
       <div className="item-icon">
-        {item.isDirectory ? '📁' : '📄'}
+        {item.is_directory ? '📁' : '📄'}
       </div>
       <div className="item-info">
         <div className="item-name">{item.name}</div>
         <div className="item-details">
           <span className="item-size">
-            {item.isDirectory ? 'Directorio' : `${item.size} bytes`}
+            {item.is_directory ? 'Directorio' : formatSize(item.size)}
           </span>
           <span className="item-permissions">{item.permissions}</span>
         </div>
@@ -412,9 +626,34 @@ const DirectoryItem = ({ item, onClick }) => {
           👤 {item.owner}:{item.group}
         </div>
       </div>
-      {item.isDirectory && (
+      {item.is_directory && (
         <div className="item-arrow">→</div>
       )}
+    </div>
+  );
+};
+
+// Componente para mostrar contenido de archivos
+const FileContentModal = ({ file, onClose }) => {
+  return (
+    <div className="file-content-modal">
+      <div className="modal-backdrop" onClick={onClose}></div>
+      <div className="modal-content">
+        <div className="modal-header">
+          <h4>📄 {file.name}</h4>
+          <button onClick={onClose} className="close-btn">✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="file-info">
+            <span>Tamaño: {file.size} bytes</span>
+            <span>Permisos: {file.permissions}</span>
+            <span>Propietario: {file.owner}:{file.group}</span>
+          </div>
+          <div className="file-content">
+            <pre>{file.content}</pre>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

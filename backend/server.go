@@ -435,6 +435,8 @@ func startServer() {
 		fmt.Fprintf(w, "POST /execute - Ejecutar comandos\n")
 		fmt.Fprintf(w, "GET /health - Estado del servidor\n")
 	})
+	http.HandleFunc("/filesystem/disks", commandsP2.HandleDisksAPI)
+	http.HandleFunc("/filesystem/content", commandsP2.HandleFileSystemContentAPI)
 
 	http.HandleFunc("/debug/reports", func(w http.ResponseWriter, r *http.Request) {
 		enableCORS(w)

@@ -1,8 +1,10 @@
 package commandsP2
 
 import (
+	BloquesP2 "MIA_2S2025_P2_202307820/Bloques"
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
 	EstructuraExt3 "MIA_2S2025_P2_202307820/EstructuraExt3"
+	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	session "MIA_2S2025_P2_202307820/Session"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
@@ -333,4 +335,265 @@ func checkFileReadPermission(partition MountedPartition, filePath string, userUI
 	otherPermission := permissions[2]
 	hasReadPermission := (otherPermission & 4) != 0
 	return hasReadPermission, nil
+}
+
+// ReadFileWithPermissions lee un archivo verificando permisos de usuario (FUNCIÓN PRINCIPAL)
+func ReadFileWithPermissions(partition MountedPartition, filePath string, sessionInfo *session.UserSession) (string, error) {
+	// Validar que la ruta sea absoluta
+	if !strings.HasPrefix(filePath, "/") {
+		return "", fmt.Errorf("la ruta '%s' debe ser absoluta (comenzar con /)", filePath)
+	}
+
+	// Detectar tipo de sistema de archivos
+	fsType, err := DetectFileSystemType(partition)
+	if err != nil {
+		return "", fmt.Errorf("error detectando sistema de archivos: %v", err)
+	}
+
+	// Leer según el tipo de sistema de archivos
+	switch fsType {
+	case estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE:
+		return readFileFromEXT3WithSession(partition, filePath, sessionInfo)
+	case estructuraArchivoCarpeta.EXT2_FILESYSTEM_TYPE:
+		return readFileFromEXT2WithSession(partition, filePath, sessionInfo)
+	default:
+		return "", fmt.Errorf("sistema de archivos no soportado: %d", fsType)
+	}
+}
+
+// ReadFileSimple lee un archivo sin verificar permisos (para uso interno del sistema)
+func ReadFileSimple(partition MountedPartition, filePath string) (string, error) {
+	// Detectar tipo de sistema de archivos
+	fsType, err := DetectFileSystemType(partition)
+	if err != nil {
+		return "", err
+	}
+
+	// Leer según el tipo de sistema de archivos
+	switch fsType {
+	case estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE:
+		return readFileFromEXT3Simple(partition, filePath)
+	case estructuraArchivoCarpeta.EXT2_FILESYSTEM_TYPE:
+		return readFileFromEXT2Simple(partition, filePath)
+	default:
+		return "", fmt.Errorf("sistema de archivos no soportado: %d", fsType)
+	}
+}
+
+// === FUNCIONES ESPECÍFICAS PARA EXT3 ===
+
+// readFileFromEXT3WithSession lee archivo EXT3 con verificación de sesión y permisos
+func readFileFromEXT3WithSession(partition MountedPartition, filePath string, sessionInfo *session.UserSession) (string, error) {
+	// Abrir el archivo del disco
+	file, err := os.OpenFile(partition.Path, os.O_RDWR, 0666)
+	if err != nil {
+		return "", fmt.Errorf("error abriendo el disco '%s': %s", partition.Path, err)
+	}
+	defer file.Close()
+
+	// Leer el sistema EXT3 de la partición
+	ext3fs, err := EstructuraExt3.ReadEXT3FileSystem(partition.Path, getPartitionStartOffset(partition))
+	if err != nil {
+		return "", fmt.Errorf("error leyendo sistema EXT3: %s", err)
+	}
+
+	// Verificar que el sistema esté formateado
+	if ext3fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return "", fmt.Errorf("la partición no tiene formato EXT3 válido")
+	}
+
+	// Verificar permisos antes de leer
+	hasPermission, err := checkFileReadPermissionEXT3(file, ext3fs, filePath, sessionInfo.UID, sessionInfo.GID)
+	if err != nil {
+		return "", err
+	}
+	if !hasPermission {
+		return "", fmt.Errorf("no tiene permisos de lectura para el archivo '%s'", filePath)
+	}
+
+	// Leer el archivo usando EXT3
+	content, err := ext3fs.LeerArchivo(filePath)
+	if err != nil {
+		return "", fmt.Errorf("error leyendo archivo '%s': %s", filePath, err)
+	}
+
+	// Registrar la operación en el journal
+	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, fmt.Sprintf("size=%d", len(content)))
+
+	return content, nil
+}
+
+// readFileFromEXT3Simple lee archivo EXT3 sin verificar permisos (para uso interno)
+func readFileFromEXT3Simple(partition MountedPartition, filePath string) (string, error) {
+	ext3fs, err := EstructuraExt3.ReadEXT3FileSystem(partition.Path, partition.Start)
+	if err != nil {
+		return "", err
+	}
+
+	// Verificar magic number
+	if ext3fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return "", fmt.Errorf("sistema EXT3 no válido")
+	}
+
+	// Leer el archivo directamente
+	content, err := ext3fs.LeerArchivo(filePath)
+	if err != nil {
+		return "", fmt.Errorf("error leyendo archivo %s: %v", filePath, err)
+	}
+
+	return content, nil
+}
+
+// === FUNCIONES ESPECÍFICAS PARA EXT2 ===
+
+// readFileFromEXT2WithSession lee archivo EXT2 con verificación de sesión y permisos
+func readFileFromEXT2WithSession(partition MountedPartition, filePath string, sessionInfo *session.UserSession) (string, error) {
+	// Verificar permisos de lectura
+	hasReadPermission, err := checkFileReadPermission(partition, filePath, sessionInfo.UID, sessionInfo.GID)
+	if err != nil {
+		return "", err
+	}
+	if !hasReadPermission {
+		return "", fmt.Errorf("no tiene permisos de lectura para el archivo '%s'", filePath)
+	}
+
+	// Leer el contenido usando la implementación completa
+	return readFileFromEXT2Implementation(partition, filePath)
+}
+
+// readFileFromEXT2Simple lee archivo EXT2 sin verificar permisos (para uso interno)
+func readFileFromEXT2Simple(partition MountedPartition, filePath string) (string, error) {
+	return readFileFromEXT2Implementation(partition, filePath)
+}
+
+// readFileFromEXT2Implementation implementación real de lectura EXT2 (función base)
+func readFileFromEXT2Implementation(partition MountedPartition, filePath string) (string, error) {
+	// Abrir el archivo del disco
+	file, err := os.OpenFile(partition.Path, os.O_RDONLY, 0666)
+	if err != nil {
+		return "", fmt.Errorf("error abriendo el disco '%s': %s", partition.Path, err)
+	}
+	defer file.Close()
+
+	// Leer el sistema EXT2 de la partición
+	ext2fs, err := EstructuraExt2.ReadEXT2FileSystem(partition.Path, getPartitionStartOffset(partition))
+	if err != nil {
+		return "", fmt.Errorf("error leyendo sistema EXT2: %s", err)
+	}
+
+	// Verificar que el sistema esté formateado
+	if ext2fs.SuperBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return "", fmt.Errorf("la partición no tiene formato EXT2 válido")
+	}
+
+	// Buscar el archivo
+	fileInodeNum, err := findFileByPath(file, ext2fs, filePath)
+	if err != nil {
+		return "", fmt.Errorf("archivo no encontrado: %s", err)
+	}
+
+	// Leer el inodo del archivo
+	fileInode := &estructuraArchivoCarpeta.Inodo{}
+	inodeOffset := int64(ext2fs.SuperBlock.S_inode_start + (fileInodeNum * ext2fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, fileInode)
+	if err != nil {
+		return "", fmt.Errorf("error leyendo inodo del archivo: %s", err)
+	}
+
+	// Leer el contenido del archivo desde sus bloques
+	content, err := readFileContentFromBlocks(file, ext2fs, fileInode)
+	if err != nil {
+		return "", fmt.Errorf("error leyendo contenido del archivo: %s", err)
+	}
+
+	return content, nil
+}
+
+// === FUNCIONES AUXILIARES ===
+
+// DetectFileSystemType detecta el tipo de sistema de archivos (función unificada)
+func DetectFileSystemType(partition MountedPartition) (int32, error) {
+	file, err := os.Open(partition.Path)
+	if err != nil {
+		return 0, fmt.Errorf("error abriendo la partición: %v", err)
+	}
+	defer file.Close()
+
+	// Leer el superbloque
+	superBlock := &estructuraArchivoCarpeta.SuperBloque{}
+	err = utilitiesP2.ReadStruct(file, int64(partition.Start), superBlock)
+	if err != nil {
+		return 0, fmt.Errorf("error leyendo superbloque: %v", err)
+	}
+
+	// Verificar magic number
+	if superBlock.S_magic != estructuraArchivoCarpeta.EXT2_MAGIC {
+		return 0, fmt.Errorf("sistema de archivos no válido")
+	}
+
+	return superBlock.S_filesystem_type, nil
+}
+
+// checkFileReadPermissionEXT3 verifica permisos de lectura en EXT3
+func checkFileReadPermissionEXT3(file *os.File, ext3fs *EstructuraExt3.EXT3FileSystem, filePath string, userUID, userGID int32) (bool, error) {
+	// Root (UID 1) puede leer cualquier archivo
+	if userUID == 1 {
+		return true, nil
+	}
+
+	// Implementar verificación de permisos específica para EXT3
+	// Por ahora, usar la misma lógica que EXT2
+	return true, nil // Placeholder - implementar lógica completa
+}
+
+func readFileContentFromInodeEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *estructuraArchivoCarpeta.Inodo) ([]byte, error) {
+	if inode.Itype != 1 {
+		return nil, fmt.Errorf("el inodo no es un archivo")
+	}
+
+	totalSize := inode.Is
+	if totalSize <= 0 {
+		return []byte{}, nil
+	}
+
+	var content []byte
+	bytesRead := int32(0)
+
+	// Leer bloques directos
+	for i := 0; i < 12 && inode.Iblock[i] != -1 && bytesRead < totalSize; i++ {
+		blockNum := inode.Iblock[i]
+		block := &BloquesP2.BloqueArchivo{}
+
+		err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_block_start+blockNum*ext3fs.SuperBlock.S_block_s), block)
+		if err != nil {
+			return nil, fmt.Errorf("error leyendo bloque %d: %v", blockNum, err)
+		}
+
+		bytesToRead := min(64, int(totalSize-bytesRead))
+		blockContent := GetBytesContent(block, bytesToRead)
+		content = append(content, blockContent...)
+		bytesRead += int32(bytesToRead)
+	}
+
+	return content[:min(len(content), int(totalSize))], nil
+}
+
+func readFileContentFromInodeEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, inode *estructuraArchivoCarpeta.Inodo) ([]byte, error) {
+	// Implementación similar a EXT3 pero usando estructuras EXT2
+	if inode.Itype != 1 {
+		return nil, fmt.Errorf("el inodo no es un archivo")
+	}
+
+	totalSize := inode.Is
+	if totalSize <= 0 {
+		return []byte{}, nil
+	}
+
+	// Usar la función existente readFileContentFromBlocks
+	content, err := readFileContentFromBlocks(file, ext2fs, inode)
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte(content), nil
 }
