@@ -26,6 +26,10 @@ func RMDISK(arg []string) {
 		path = strings.TrimSuffix(path, filepath.Ext(path)) + ".mia"
 	}
 
+	if err := UnregisterDisk(path); err != nil {
+		fmt.Printf("Error al desregistrar el disco: %s\n", err)
+	}
+
 	removerDisk(path)
 }
 

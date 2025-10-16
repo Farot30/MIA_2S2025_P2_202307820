@@ -84,6 +84,11 @@ func MKDISK(args []string) {
 		return
 	}
 
+	if err := RegisterDisk(path, sizeInBytes, fitByte); err != nil {
+		fmt.Printf("Error registrando el disco: %s\n", err)
+		return
+	}
+
 	// INFORMACIÓN DETALLADA DE DEPURACIÓN
 	fmt.Printf("\n=== DISCO CREADO EXITOSAMENTE ===\n")
 	fmt.Printf("Ruta: %s\n", path)

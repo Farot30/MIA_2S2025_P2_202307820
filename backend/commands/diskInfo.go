@@ -4,6 +4,7 @@ import (
 	structuresP2 "MIA_2S2025_P2_202307820/structures"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -57,8 +58,28 @@ func HandleDisksAPI(w http.ResponseWriter, r *http.Request) {
 	// Obtener información de particiones montadas
 	mountedPartitions := GetAllMountedPartitions()
 
-	// Buscar archivos .mia en directorios comunes
-	diskPaths := findDiskFiles()
+	// PRIMERO: Obtener discos del registro
+	var diskPaths []string
+	registeredDisks, err := GetRegisteredDisks()
+	if err == nil {
+		for _, regDisk := range registeredDisks {
+			diskPaths = append(diskPaths, regDisk.Path)
+		}
+	}
+
+	// SEGUNDO: Buscar discos adicionales en ubicaciones comunes (fallback)
+	fallbackPaths := findDiskFiles()
+
+	// Combinar ambas listas eliminando duplicados
+	pathSet := make(map[string]bool)
+	for _, path := range diskPaths {
+		pathSet[path] = true
+	}
+	for _, path := range fallbackPaths {
+		if !pathSet[path] {
+			diskPaths = append(diskPaths, path)
+		}
+	}
 
 	var disks []DiskInfo
 	for _, diskPath := range diskPaths {
@@ -67,12 +88,17 @@ func HandleDisksAPI(w http.ResponseWriter, r *http.Request) {
 			continue // Saltar discos que no se pueden leer
 		}
 		disks = append(disks, diskInfo)
+
+		// Actualizar último acceso en el registro
+		UpdateLastAccessed(diskPath)
 	}
 
 	response := map[string]interface{}{
 		"success": true,
 		"disks":   disks,
 		"total":   len(disks),
+		"message": fmt.Sprintf("Se encontraron %d discos (%d registrados, %d descubiertos)",
+			len(disks), len(registeredDisks), len(fallbackPaths)),
 	}
 
 	json.NewEncoder(w).Encode(response)

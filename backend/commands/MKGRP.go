@@ -106,13 +106,9 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 		return fmt.Errorf("la partición no tiene formato EXT3 válido")
 	}
 
-	// REGISTRO EN JOURNAL: Inicio de operación
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Iniciando creación de grupo: %s", groupName))
-
 	// Buscar el archivo users.txt en el directorio raíz
 	usersInodeNum, err := findFileInRootDirectoryEXT3(file, ext3fs, "users.txt")
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error: users.txt no encontrado - %s", err.Error()))
 		return fmt.Errorf("archivo users.txt no encontrado: %s", err)
 	}
 
@@ -121,28 +117,22 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (usersInodeNum * ext3fs.SuperBlock.S_inode_s))
 	err = utilitiesP2.ReadStruct(file, inodeOffset, usersInode)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error leyendo inodo users.txt: %s", err.Error()))
 		return fmt.Errorf("error leyendo inodo de users.txt: %s", err)
 	}
 
 	// Leer el contenido actual del archivo users.txt
 	currentContent, err := readFileContentFromBlocksEXT3(file, ext3fs, usersInode)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error leyendo contenido users.txt: %s", err.Error()))
 		return fmt.Errorf("error leyendo contenido de users.txt: %s", err)
 	}
 
 	// Verificar que el grupo no existe ya
 	if groupExists(currentContent, groupName) {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error: Grupo %s ya existe", groupName))
 		return fmt.Errorf("el grupo '%s' ya existe", groupName)
 	}
 
 	// Obtener el siguiente ID de grupo disponible
 	nextGID := getNextGroupID(currentContent)
-
-	// REGISTRO EN JOURNAL: Asignación de GID
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Asignando GID %d al grupo %s", nextGID, groupName))
 
 	// Crear la entrada del nuevo grupo
 	groupEntry := fmt.Sprintf("%d,G,%s", nextGID, groupName)
@@ -157,7 +147,6 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	// Escribir el contenido actualizado de vuelta al archivo
 	err = writeContentToFileEXT3(file, ext3fs, usersInode, newContent, usersInodeNum)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Error escribiendo users.txt: %s", err.Error()))
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
@@ -253,21 +242,30 @@ func findFileInRootDirectoryEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fil
 	return -1, fmt.Errorf("archivo '%s' no encontrado en el directorio raíz", filename)
 }
 
-// readFileContentFromBlocksEXT3 lee el contenido completo de un archivo desde sus bloques en EXT3
+// readFileContentFromBlocksEXT3 - VERSION CON MAS DEBUG
 func readFileContentFromBlocksEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *estructuraArchivoCarpeta.Inodo) (string, error) {
-	var content strings.Builder
-	blocks := inode.GetIblock()
-	fileSize := inode.Is // Tamaño total del archivo
+	fileSize := inode.Is
+
+	if fileSize <= 0 {
+		return "", nil
+	}
+
+	fmt.Printf("\n=== DEBUG LECTURA EXT3 ===\n")
+	fmt.Printf("Tamaño del archivo según inodo: %d bytes\n", fileSize)
+
+	contentBuffer := make([]byte, fileSize)
 	bytesRead := int32(0)
 
-	// Leer bloques directos
+	blocks := inode.GetIblock()
+	fmt.Printf("Bloques del inodo: %v\n", blocks[:4])
+
+	// Leer bloques directos (0-11)
 	for i := 0; i < 12 && bytesRead < fileSize; i++ {
 		blockNum := blocks[i]
 		if blockNum == -1 {
-			break // No hay más bloques directos
+			break
 		}
 
-		// Leer el bloque de archivo
 		fileBlock := &bloques.BloqueArchivo{}
 		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
 
@@ -276,28 +274,72 @@ func readFileContentFromBlocksEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 			return "", fmt.Errorf("error leyendo bloque %d: %s", blockNum, err)
 		}
 
-		// Calcular cuántos bytes leer de este bloque
-		bytesToRead := int32(64) // Tamaño de bloque
+		bytesToRead := int32(64)
 		if fileSize-bytesRead < bytesToRead {
 			bytesToRead = fileSize - bytesRead
 		}
 
-		// Agregar el contenido del bloque
+		copy(contentBuffer[bytesRead:bytesRead+bytesToRead], fileBlock.B_content[:bytesToRead])
+
+		// DEBUG: Mostrar qué se leyó
 		blockContent := string(fileBlock.B_content[:bytesToRead])
-		blockContent = strings.TrimRight(blockContent, "\x00")
-		content.WriteString(blockContent)
+		fmt.Printf("\n--- DEBUG BLOQUE %d (num: %d) ---\n", i, blockNum)
+		fmt.Printf("Bytes leídos: %d\n", bytesToRead)
+		fmt.Printf("Contenido del bloque:\n%s\n", blockContent)
+		fmt.Printf("-------------------------------\n")
 
 		bytesRead += bytesToRead
+		fmt.Printf("DEBUG: Bloque directo %d leído - %d bytes (total: %d/%d)\n", i, bytesToRead, bytesRead, fileSize)
 	}
 
-	// Leer bloques indirectos si es necesario
+	// Leer bloque indirecto simple (índice 12) si es necesario
 	if bytesRead < fileSize && blocks[12] != -1 {
-		// Implementar lectura de bloques indirectos aquí si es necesario
-		fmt.Printf("DEBUG: Se necesita leer bloques indirectos (%d bytes restantes)\n", fileSize-bytesRead)
+		fmt.Printf("DEBUG: Leyendo bloque indirecto simple: %d\n", blocks[12])
+
+		apuntadorBlock := &bloques.BloqueApuntador{}
+		apuntadorOffset := int64(ext3fs.SuperBlock.S_block_start + (blocks[12] * ext3fs.SuperBlock.S_block_s))
+
+		err := utilitiesP2.ReadStruct(file, apuntadorOffset, apuntadorBlock)
+		if err != nil {
+			return "", fmt.Errorf("error leyendo bloque de apuntadores: %s", err)
+		}
+
+		for i := 0; i < 16 && bytesRead < fileSize; i++ {
+			blockNum := apuntadorBlock.B_pointers[i]
+			if blockNum == -1 {
+				continue
+			}
+
+			fileBlock := &bloques.BloqueArchivo{}
+			blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
+
+			err := utilitiesP2.ReadStruct(file, blockOffset, fileBlock)
+			if err != nil {
+				fmt.Printf("DEBUG: Error leyendo bloque indirecto %d: %s\n", blockNum, err)
+				continue
+			}
+
+			bytesToRead := int32(64)
+			if fileSize-bytesRead < bytesToRead {
+				bytesToRead = fileSize - bytesRead
+			}
+
+			copy(contentBuffer[bytesRead:bytesRead+bytesToRead], fileBlock.B_content[:bytesToRead])
+			bytesRead += bytesToRead
+
+			fmt.Printf("DEBUG: Bloque indirecto %d (%d) leído - %d bytes (total: %d/%d)\n",
+				i, blockNum, bytesToRead, bytesRead, fileSize)
+		}
 	}
 
-	fmt.Printf("DEBUG: Total bytes leídos EXT3: %d/%d\n", bytesRead, fileSize)
-	return content.String(), nil
+	result := string(contentBuffer)
+
+	fmt.Printf("\n=== CONTENIDO COMPLETO LEÍDO ===\n")
+	fmt.Printf("Total bytes leídos: %d/%d\n", bytesRead, fileSize)
+	fmt.Printf("Contenido:\n%s\n", result)
+	fmt.Printf("================================\n\n")
+
+	return result, nil
 }
 
 // writeContentToFileEXT3 escribe contenido actualizado al archivo users.txt en EXT3
@@ -314,9 +356,6 @@ func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 	if blocksNeeded > 16 {
 		return fmt.Errorf("el contenido es demasiado grande: necesita %d bloques, máximo 16", blocksNeeded)
 	}
-
-	// Registrar en journal el inicio de escritura
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Escribiendo %d bytes en %d bloques", contentSize, blocksNeeded))
 
 	// Escribir el contenido en los bloques existentes
 	bytesWritten := int32(0)
@@ -353,7 +392,6 @@ func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
 		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
 		if err != nil {
-			LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Error escribiendo bloque %d: %s", blockNum, err.Error()))
 			return fmt.Errorf("error escribiendo bloque %d: %s", blockNum, err)
 		}
 
@@ -369,12 +407,8 @@ func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
 	err := utilitiesP2.WriteStruct(file, inodeOffset, inode)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Error actualizando inodo: %s", err.Error()))
 		return fmt.Errorf("error actualizando inodo: %s", err)
 	}
-
-	// Registrar en journal el éxito de la escritura
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", fmt.Sprintf("Escritura completada: %d bytes escritos", bytesWritten))
 
 	return nil
 }

@@ -190,7 +190,7 @@ func createUserExt3(file *os.File, partition MountedPartition, username, passwor
 	fmt.Printf("Tamaño actual: %d bytes → Nuevo tamaño: %d bytes\n",
 		int32(len([]byte(currentContent))), newContentSize)
 
-	showFileSpaceInfo(usersInode, newContentSize)
+	writeContentToFileUserEXT3(file, ext3fs, usersInode, newContent, usersInodeNum)
 
 	err = writeContentToFileEXT3(file, ext3fs, usersInode, newContent, usersInodeNum)
 	if err != nil {
@@ -280,21 +280,31 @@ func createUserExt2(file *os.File, partition MountedPartition, username, passwor
 // userExists verifica si un usuario ya existe en el contenido de users.txt
 func userExists(content, username string) bool {
 	lines := strings.Split(content, "\n")
-	for _, line := range lines {
+	fmt.Printf("DEBUG: Verificando si usuario '%s' existe...\n", username)
+
+	for lineNum, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 
-		// Parsear la línea: ID,TIPO,NOMBRE[,GRUPO,PASSWORD] para usuarios
+		// Parsear la línea: ID,TIPO,GRUPO,USUARIO,PASSWORD para usuarios
 		parts := strings.Split(line, ",")
-		if len(parts) >= 5 {
-			// parts[0] = ID, parts[1] = TIPO (G/U), parts[2] = USERNAME, parts[3] = GRUPO, parts[4] = PASSWORD
-			if parts[1] == "U" && parts[3] == username && parts[0] != "0" {
-				return true // Usuario existe y no está eliminado
+		fmt.Printf("DEBUG: Línea %d: %s -> %d partes\n", lineNum+1, line, len(parts))
+
+		if len(parts) >= 5 && parts[1] == "U" {
+			// parts[0] = ID, parts[1] = TIPO (U), parts[2] = GRUPO, parts[3] = USUARIO, parts[4] = PASSWORD
+			existingUser := strings.TrimSpace(parts[3])
+			fmt.Printf("DEBUG: Usuario encontrado: '%s' (buscando: '%s')\n", existingUser, username)
+
+			if existingUser == username && parts[0] != "0" {
+				fmt.Printf("DEBUG: ¡Usuario '%s' ya existe!\n", username)
+				return true
 			}
 		}
 	}
+
+	fmt.Printf("DEBUG: Usuario '%s' no existe\n", username)
 	return false
 }
 

@@ -5,6 +5,7 @@ import (
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
 	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	session "MIA_2S2025_P2_202307820/Session"
+	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	structuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
@@ -279,49 +280,87 @@ func extractGroupFromUserLine(userLine string) string {
 	return "desconocido"
 }
 
-func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *structuraArchivoCarpeta.Inodo, content string, inodeNum int32) error {
+// writeContentToFileUserEXT3 escribe contenido en EXT3 - VERSIÓN CORREGIDA
+func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *estructuraArchivoCarpeta.Inodo, content string, inodeNum int32) error {
 	contentBytes := []byte(content)
 	contentSize := int32(len(contentBytes))
 
-	fmt.Printf("DEBUG: Escribiendo %d bytes al archivo users.txt\n", contentSize)
+	fmt.Printf("\n=== DEBUG ESCRITURA EXT3 ===\n")
+	fmt.Printf("Contenido a escribir (%d bytes):\n%s\n", contentSize, content)
+	fmt.Printf("============================\n\n")
 
-	blocksNeed := (contentSize + 63) / 64 // Cada bloque es de 64 bytes
+	// Calcular bloques necesarios
+	blocksNeeded := (contentSize + 63) / 64
 
+	// Obtener bloques actuales
 	blocks := inode.GetIblock()
-	blocckUsed := int32(0)
+	directBlocksUsed := int32(0)
 	for i := 0; i < 12; i++ {
 		if blocks[i] != -1 {
-			blocckUsed++
+			directBlocksUsed++
 		}
 	}
 
-	if blocksNeed > blocckUsed {
-		for i := int(blocckUsed); i < 12 && i < int(blocksNeed); i++ {
-			newBlockNum, err := findFreeBlockEXT3(file, ext3fs)
-			if err != nil {
-				return fmt.Errorf("no hay bloques libres: %s", err)
-			}
-			inode.SetIblock(i, newBlockNum)
-			err = markBlockAsUsedEXT3For(file, ext3fs, newBlockNum)
-			if err != nil {
-				return fmt.Errorf("error marcando bloque %d como usado: %s", newBlockNum, err)
-			}
-			ext3fs.SuperBlock.S_free_blocks_count--
-			fmt.Printf("bloque adicional %d asignado al inodo %d\n", newBlockNum, i)
+	fmt.Printf("DEBUG: Bloques necesarios: %d, Bloques directos actuales: %d\n", blocksNeeded, directBlocksUsed)
+	fmt.Printf("DEBUG: Bloques actuales del inodo: %v\n", blocks[:4])
+
+	// === ASIGNAR BLOQUES DIRECTOS ADICIONALES SI SON NECESARIOS ===
+	for i := int(directBlocksUsed); i < 12 && i < int(blocksNeeded); i++ {
+		newBlockNum, err := findFreeBlockEXT3(file, ext3fs)
+		if err != nil {
+			return fmt.Errorf("no hay bloques libres disponibles: %s", err)
 		}
+
+		// VERIFICAR QUE EL BLOQUE NO ESTÉ YA ASIGNADO
+		isAlreadyUsed := false
+		for j := 0; j < i; j++ {
+			if inode.GetIblock()[j] == newBlockNum {
+				isAlreadyUsed = true
+				break
+			}
+		}
+
+		if isAlreadyUsed {
+			fmt.Printf("⚠️  ADVERTENCIA: Bloque %d ya está asignado, buscando otro...\n", newBlockNum)
+			// Marcar como usado para que findFreeBlockEXT3 no lo vuelva a encontrar
+			err = markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
+			if err != nil {
+				return fmt.Errorf("error marcando bloque temporal como usado: %s", err)
+			}
+			i-- // Reintentar con el mismo índice
+			continue
+		}
+
+		inode.SetIblock(i, newBlockNum)
+		err = markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
+		if err != nil {
+			return fmt.Errorf("error marcando bloque como usado: %s", err)
+		}
+		ext3fs.SuperBlock.S_free_blocks_count--
+		fmt.Printf("✅ Bloque adicional %d asignado en posición %d del inodo %d\n", newBlockNum, i, inodeNum)
 	}
 
+	// Asignar el array devuelto por GetIblock a una variable
+	iblockArray := inode.GetIblock()
+
+	// Convertir el array en un slice
+	iblockSlice := iblockArray[:]
+
+	// Ahora puedes usar iblockSlice
+	fmt.Printf("Bloques finales del inodo: %v\n", iblockSlice[:4])
+
+	// === MANEJAR BLOQUE INDIRECTO SIMPLE (índice 12) SI ES NECESARIO ===
 	var apuntador *bloques.BloqueApuntador
-	if blocksNeed > 12 {
-		if inode.GetIblock()[12] == -1 {
+	if blocksNeeded > 12 {
+		if inode.GetIblock()[12] != -1 {
 			indirectBlockNum := inode.GetIblock()[12]
 			apuntador = bloques.NewBloqueApuntador()
-			blockOffset := int64(ext3fs.SuperBlock.S_block_s + (indirectBlockNum * ext3fs.SuperBlock.S_block_s))
+			blockOffset := int64(ext3fs.SuperBlock.S_block_start + (indirectBlockNum * ext3fs.SuperBlock.S_block_s))
 			err := utilitiesP2.ReadStruct(file, blockOffset, apuntador)
-
 			if err != nil {
-				return fmt.Errorf("error leyendo bloque de apuntadores indirectos: %s", err)
+				return fmt.Errorf("error leyendo bloque de apuntadores existente: %s", err)
 			}
+			fmt.Printf("DEBUG: Bloque indirecto existente: %d\n", indirectBlockNum)
 		} else {
 			apuntador = bloques.NewBloqueApuntador()
 			indirectBlockNum, err := findFreeBlockEXT3(file, ext3fs)
@@ -329,25 +368,30 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 				return fmt.Errorf("no hay bloques libres para bloque de apuntadores: %s", err)
 			}
 			inode.SetIblock(12, indirectBlockNum)
-			err = markBlockAsUsedEXT3For(file, ext3fs, indirectBlockNum)
+			err = markBlockAsUsedEXT3(file, ext3fs, indirectBlockNum)
 			if err != nil {
 				return fmt.Errorf("error marcando bloque de apuntadores como usado: %s", err)
 			}
 			ext3fs.SuperBlock.S_free_blocks_count--
+			fmt.Printf("DEBUG: Nuevo bloque indirecto asignado: %d\n", indirectBlockNum)
+
+			LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt",
+				fmt.Sprintf("Bloque indirecto %d asignado", indirectBlockNum))
 		}
 
-		for i := 12; i < int(blocksNeed) && (i-12) < 16; i++ {
+		for i := 12; i < int(blocksNeeded) && (i-12) < 16; i++ {
 			if apuntador.B_pointers[i-12] == -1 {
 				blockNum, err := findFreeBlockEXT3(file, ext3fs)
 				if err != nil {
 					return fmt.Errorf("no se pudo encontrar un bloque libre: %s", err)
 				}
 				apuntador.B_pointers[i-12] = blockNum
-				err = markBlockAsUsedEXT3For(file, ext3fs, blockNum)
+				err = markBlockAsUsedEXT3(file, ext3fs, blockNum)
 				if err != nil {
 					return fmt.Errorf("error marcando bloque como usado: %s", err)
 				}
 				ext3fs.SuperBlock.S_free_blocks_count--
+				fmt.Printf("DEBUG: Bloque indirecto %d asignado en apuntador[%d]\n", blockNum, i-12)
 			}
 		}
 
@@ -356,117 +400,38 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 		if err != nil {
 			return fmt.Errorf("error escribiendo bloque de apuntadores: %s", err)
 		}
-		fmt.Printf("[DEBUG] Bloque Apuntador Simple (bloque %d): %v\n", inode.GetIblock()[12], apuntador.B_pointers)
 	}
 
-	var dobleApuntador *bloques.BloqueApuntador // CORREGIDO: Declarar fuera del if
-	if blocksNeed > 28 {
-		dobleApuntador = bloques.NewBloqueApuntador()
-		if inode.GetIblock()[13] != -1 {
-			dobleBlockNum := inode.GetIblock()[13]
-			dobleOffset := int64(ext3fs.SuperBlock.S_block_start + (dobleBlockNum * ext3fs.SuperBlock.S_block_s))
-			utilitiesP2.ReadStruct(file, dobleOffset, dobleApuntador)
-		} else {
-			dobleBlockNum, err := findFreeBlockEXT3(file, ext3fs)
-			if err != nil {
-				return fmt.Errorf("no hay bloques libres para bloque de apuntadores doble: %s", err)
-			}
-			inode.SetIblock(13, dobleBlockNum)
-			err = markBlockAsUsedEXT3For(file, ext3fs, dobleBlockNum)
-			if err != nil {
-				return fmt.Errorf("error marcando bloque de apuntadores doble como usado: %s", err)
-			}
-			ext3fs.SuperBlock.S_free_blocks_count--
-		}
-
-		// CORREGIDO: Lógica de asignación de bloques dobles
-		for i := int32(28); i < blocksNeed && i < 284; i++ {
-			hijoIndex := (i - 28) / 16
-			hijoOffset := (i - 28) % 16
-
-			var hijoNum int32
-			var hijo *bloques.BloqueApuntador
-
-			// Crear o leer el hijo
-			if dobleApuntador.B_pointers[hijoIndex] == -1 {
-				hijo = bloques.NewBloqueApuntador()
-				hijoNum, err := findFreeBlockEXT3(file, ext3fs)
-				if err != nil {
-					return fmt.Errorf("no hay bloques libres para bloque de apuntadores doble hijo: %s", err)
-				}
-				dobleApuntador.B_pointers[hijoIndex] = hijoNum
-				err = markBlockAsUsedEXT3For(file, ext3fs, hijoNum) // CORREGIDO: Marcar bloque hijo como usado
-				if err != nil {
-					return fmt.Errorf("error marcando bloque hijo como usado: %s", err)
-				}
-				ext3fs.SuperBlock.S_free_blocks_count--
-			} else {
-				hijoNum = dobleApuntador.B_pointers[hijoIndex]
-				hijo = bloques.NewBloqueApuntador()
-				hijoOffsetDisk := int64(ext3fs.SuperBlock.S_block_start + (hijoNum * ext3fs.SuperBlock.S_block_s))
-				utilitiesP2.ReadStruct(file, hijoOffsetDisk, hijo)
-			}
-
-			// Asignar bloque de datos si no existe
-			if hijo.B_pointers[hijoOffset] == -1 {
-				blockNum, err := findFreeBlockEXT3(file, ext3fs)
-				if err != nil {
-					return fmt.Errorf("no se pudo encontrar un bloque libre: %s", err)
-				}
-				hijo.B_pointers[hijoOffset] = blockNum
-				err = markBlockAsUsedEXT3For(file, ext3fs, blockNum)
-				if err != nil {
-					return fmt.Errorf("error marcando bloque como usado: %s", err)
-				}
-				ext3fs.SuperBlock.S_free_blocks_count--
-			}
-
-			// Escribir el bloque hijo
-			hijoOffsetDisk := int64(ext3fs.SuperBlock.S_block_start + (hijoNum * ext3fs.SuperBlock.S_block_s))
-			utilitiesP2.WriteStruct(file, hijoOffsetDisk, hijo)
-		}
-
-		// Escribir el bloque doble principal
-		dobleBlockNum := inode.GetIblock()[13]
-		dobleOffset := int64(ext3fs.SuperBlock.S_block_start + (dobleBlockNum * ext3fs.SuperBlock.S_block_s))
-		err := utilitiesP2.WriteStruct(file, dobleOffset, dobleApuntador)
-		if err != nil {
-			return fmt.Errorf("error escribiendo bloque de apuntadores doble: %s", err)
-		}
-		fmt.Printf("[DEBUG] Bloque Apuntador Doble (bloque %d): %v\n", dobleBlockNum, dobleApuntador.B_pointers)
-	}
-
-	// CORREGIDO: Función getBlockNumber para manejar todos los tipos de bloques
+	// === FUNCIÓN HELPER PARA OBTENER NÚMERO DE BLOQUE ===
 	getBlockNumber := func(index int32) int32 {
 		if index < 12 {
-			return inode.GetIblock()[index]
-		} else if index < 28 {
-			if apuntador != nil {
-				return apuntador.B_pointers[index-12]
-			}
-		} else if index < 284 {
-			if dobleApuntador != nil {
-				hijoIndex := (index - 28) / 16
-				hijoOffset := (index - 28) % 16
-				if dobleApuntador.B_pointers[hijoIndex] != -1 {
-					// Leer el bloque hijo
-					hijo := bloques.NewBloqueApuntador()
-					hijoNum := dobleApuntador.B_pointers[hijoIndex]
-					hijoOffsetDisk := int64(ext3fs.SuperBlock.S_block_start + (hijoNum * ext3fs.SuperBlock.S_block_s))
-					utilitiesP2.ReadStruct(file, hijoOffsetDisk, hijo)
-					return hijo.B_pointers[hijoOffset]
-				}
-			}
+			blockNum := inode.GetIblock()[index]
+			fmt.Printf("DEBUG: getBlockNumber(%d) = %d (directo)\n", index, blockNum)
+			return blockNum
+		} else if index < 28 && apuntador != nil {
+			blockNum := apuntador.B_pointers[index-12]
+			fmt.Printf("DEBUG: getBlockNumber(%d) = %d (indirecto)\n", index, blockNum)
+			return blockNum
 		}
+		fmt.Printf("DEBUG: getBlockNumber(%d) = -1 (no asignado)\n", index)
 		return -1
 	}
 
-	// ESCRIBIR CONTENIDO EN TODOS LOS BLOQUES NECESARIOS
+	// === ESCRIBIR CONTENIDO COMPLETO EN TODOS LOS BLOQUES ===
 	bytesWritten := int32(0)
-	for blockIndex := 0; blockIndex < int(blocksNeed); blockIndex++ {
-		blockNum := getBlockNumber(int32(blockIndex)) // CORREGIDO: Usar la función helper
+	for blockIndex := 0; blockIndex < int(blocksNeeded); blockIndex++ {
+		blockNum := getBlockNumber(int32(blockIndex))
 		if blockNum == -1 {
 			return fmt.Errorf("bloque %d no asignado correctamente", blockIndex)
+		}
+
+		// VERIFICAR QUE NO SE ESTÁ ESCRIBIENDO AL MISMO BLOQUE DOS VECES
+		for prevIndex := 0; prevIndex < blockIndex; prevIndex++ {
+			prevBlockNum := getBlockNumber(int32(prevIndex))
+			if prevBlockNum == blockNum {
+				return fmt.Errorf("ERROR CRÍTICO: Bloque %d está duplicado en posiciones %d y %d",
+					blockNum, prevIndex, blockIndex)
+			}
 		}
 
 		remainingBytes := contentSize - bytesWritten
@@ -475,44 +440,44 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 			bytesToWrite = remainingBytes
 		}
 
+		// Crear y llenar el bloque COMPLETAMENTE LIMPIO
 		fileBlock := &bloques.BloqueArchivo{}
 		for i := 0; i < 64; i++ {
 			fileBlock.B_content[i] = 0
 		}
+
+		// Copiar el contenido correspondiente a este bloque
 		if bytesToWrite > 0 {
 			copy(fileBlock.B_content[:bytesToWrite], contentBytes[bytesWritten:bytesWritten+bytesToWrite])
 		}
 
+		// DEBUG: Mostrar qué se está escribiendo
+		blockContent := string(fileBlock.B_content[:bytesToWrite])
+		fmt.Printf("\n--- DEBUG BLOQUE %d (num: %d) ---\n", blockIndex, blockNum)
+		fmt.Printf("Posición en contenido: %d-%d\n", bytesWritten, bytesWritten+bytesToWrite)
+		fmt.Printf("Bytes a escribir: %d\n", bytesToWrite)
+		fmt.Printf("Contenido del bloque:\n%s\n", blockContent)
+		fmt.Printf("-------------------------------\n")
+
+		// Escribir el bloque al disco
 		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
 		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
 		if err != nil {
 			return fmt.Errorf("error escribiendo bloque %d: %s", blockNum, err)
 		}
+
 		bytesWritten += bytesToWrite
-		fmt.Printf("DEBUG: Bloque %d escrito: %d bytes (total: %d)\n", blockIndex, bytesToWrite, bytesWritten)
+		fmt.Printf("✅ Bloque %d (físico #%d) escrito: %d bytes (total: %d/%d)\n",
+			blockIndex, blockNum, bytesToWrite, bytesWritten, contentSize)
 	}
 
-	// LIMPIAR BLOQUES NO USADOS (si el archivo se redujo)
-	for i := int(blocksNeed); i < 12; i++ {
-		if inode.GetIblock()[i] != -1 {
-			oldBlockNum := inode.GetIblock()[i]
-			emptyBlock := &bloques.BloqueArchivo{}
-			blockOffset := int64(ext3fs.SuperBlock.S_block_start + (oldBlockNum * ext3fs.SuperBlock.S_block_s))
-			utilitiesP2.WriteStruct(file, blockOffset, emptyBlock)
-			markBlockAsFreeEXT3For(file, ext3fs, oldBlockNum)
-			inode.SetIblock(i, -1)
-			ext3fs.SuperBlock.S_free_blocks_count++
-			fmt.Printf("🗑️  Bloque %d liberado de posición %d\n", oldBlockNum, i)
-		}
-	}
-
-	// Actualizar el superbloque
+	// === ACTUALIZAR SUPERBLOQUE ===
 	err := utilitiesP2.WriteStruct(file, int64(ext3fs.StartOffset), ext3fs.SuperBlock)
 	if err != nil {
 		return fmt.Errorf("error actualizando superbloque: %s", err)
 	}
 
-	// ACTUALIZAR EL INODO
+	// === ACTUALIZAR INODO ===
 	inode.SetSize(contentSize)
 	inode.UpdateModificationTime()
 	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
@@ -521,8 +486,19 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 		return fmt.Errorf("error actualizando inodo: %s", err)
 	}
 
-	return nil
+	fmt.Printf("\n=== ESCRITURA COMPLETADA ===\n")
+	fmt.Printf("Total escrito: %d bytes en %d bloques\n", contentSize, blocksNeeded)
+	// Asignar el array devuelto por GetIblock a una variable
+	iblockArrays := inode.GetIblock()
 
+	// Convertir el array en un slice
+	iblockSlices := iblockArrays[:]
+
+	// Ahora puedes usar iblockSlice
+	fmt.Printf("Bloques usados: %v\n", iblockSlices[:blocksNeeded])
+	fmt.Printf("============================\n\n")
+
+	return nil
 }
 
 func updateBlockBitmapEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, blockNum int32, used bool) error {

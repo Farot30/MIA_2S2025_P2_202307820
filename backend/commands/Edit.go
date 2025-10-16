@@ -822,46 +822,29 @@ func updateFileContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyste
 	return utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+fileInodeNum*ext3fs.SuperBlock.S_inode_s), fileInode)
 }
 
-// findFreeBlockEXT3 busca un bloque libre en el sistema EXT3
+// findFreeBlockEXT3 encuentra un bloque libre en EXT3 - VERSIÓN MEJORADA
 func findFreeBlockEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) (int32, error) {
-	// Si hay un bloque libre conocido, usarlo
-	if ext3fs.SuperBlock.S_first_blo != -1 {
-		freeBlock := ext3fs.SuperBlock.S_first_blo
+	bitmapSize := (ext3fs.SuperBlock.S_blocks_count + 7) / 8
+	bitmap := make([]byte, bitmapSize)
 
-		// Buscar el siguiente bloque libre para actualizar S_first_blo
-		found := false
-		for i := freeBlock + 1; i < ext3fs.SuperBlock.S_blocks_count && !found; i++ {
-			bytePos := i / 8
-			bitPos := i % 8
-
-			bitmap, err := utilitiesP2.ReadBytes(file, int64(ext3fs.SuperBlock.S_bm_block_start+bytePos), 1)
-			if err == nil && (bitmap[0]&(1<<uint(bitPos))) == 0 {
-				ext3fs.SuperBlock.S_first_blo = i
-				found = true
-			}
-		}
-
-		// Si no hay más bloques libres
-		if !found {
-			ext3fs.SuperBlock.S_first_blo = -1
-		}
-
-		return freeBlock, nil
+	_, err := file.ReadAt(bitmap, int64(ext3fs.SuperBlock.S_bm_block_start))
+	if err != nil {
+		return -1, fmt.Errorf("error leyendo bitmap de bloques: %s", err)
 	}
 
 	// Buscar un bloque libre en el bitmap
 	for i := int32(0); i < ext3fs.SuperBlock.S_blocks_count; i++ {
-		bytePos := i / 8
-		bitPos := i % 8
+		byteIndex := i / 8
+		bitIndex := i % 8
 
-		bitmap, err := utilitiesP2.ReadBytes(file, int64(ext3fs.SuperBlock.S_bm_block_start+bytePos), 1)
-		if err == nil && (bitmap[0]&(1<<uint(bitPos))) == 0 {
-			// Encontrado un bloque libre
+		// Si el bit está en 0, el bloque está libre
+		if (bitmap[byteIndex] & (1 << (7 - bitIndex))) == 0 {
+			fmt.Printf("DEBUG findFreeBlock: Bloque libre encontrado: %d\n", i)
 			return i, nil
 		}
 	}
 
-	return -1, fmt.Errorf("no hay bloques libres disponibles")
+	return -1, fmt.Errorf("no hay bloques libres disponibles (revisados %d bloques)", ext3fs.SuperBlock.S_blocks_count)
 }
 
 // markBlockAsUsedEXT2 marca un bloque como usado en el bitmap de EXT2
@@ -882,20 +865,43 @@ func markBlockAsUsedEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, b
 	return utilitiesP2.WriteBytes(file, int64(ext2fs.SuperBlock.S_bm_block_start+bytePos), bitmap)
 }
 
-// markBlockAsUsedEXT3 marca un bloque como usado en el bitmap de EXT3
+// markBlockAsUsedEXT3 marca un bloque como usado en EXT3
 func markBlockAsUsedEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, blockNum int32) error {
-	bytePos := blockNum / 8
-	bitPos := blockNum % 8
+	byteIndex := blockNum / 8
+	bitIndex := blockNum % 8
 
-	// Leer el byte actual del bitmap
-	bitmap, err := utilitiesP2.ReadBytes(file, int64(ext3fs.SuperBlock.S_bm_block_start+bytePos), 1)
+	// Leer el byte específico del bitmap
+	_, err := file.Seek(int64(ext3fs.SuperBlock.S_bm_block_start)+int64(byteIndex), 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("error seeking bitmap: %s", err)
 	}
 
-	// Marcar el bit correspondiente como usado (1)
-	bitmap[0] |= (1 << uint(bitPos))
+	var currentByte [1]byte
+	_, err = file.Read(currentByte[:])
+	if err != nil {
+		return fmt.Errorf("error reading bitmap byte: %s", err)
+	}
 
-	// Escribir el byte actualizado
-	return utilitiesP2.WriteBytes(file, int64(ext3fs.SuperBlock.S_bm_block_start+bytePos), bitmap)
+	// Verificar si el bloque ya está marcado como usado
+	mask := byte(1 << (7 - bitIndex))
+	if (currentByte[0] & mask) != 0 {
+		fmt.Printf("⚠️  ADVERTENCIA: Bloque %d ya estaba marcado como usado en el bitmap\n", blockNum)
+	}
+
+	// Modificar el bit (poner en 1 = usado)
+	currentByte[0] |= mask
+
+	// Escribir el byte modificado
+	_, err = file.Seek(int64(ext3fs.SuperBlock.S_bm_block_start)+int64(byteIndex), 0)
+	if err != nil {
+		return fmt.Errorf("error seeking bitmap for write: %s", err)
+	}
+
+	_, err = file.Write(currentByte[:])
+	if err != nil {
+		return fmt.Errorf("error writing bitmap byte: %s", err)
+	}
+
+	fmt.Printf("DEBUG markBlockAsUsed: Bloque %d marcado como usado en bitmap\n", blockNum)
+	return nil
 }
