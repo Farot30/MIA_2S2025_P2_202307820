@@ -153,7 +153,7 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	// REGISTRO EN JOURNAL: Operación completada exitosamente
 	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Grupo %s creado exitosamente con GID %d", groupName, nextGID))
 
-	fmt.Printf("Grupo '%s' creado en EXT3 con journaling (GID: %d)\n", groupName, nextGID)
+	//fmt.Printf("Grupo '%s' creado en EXT3 con journaling (GID: %d)\n", groupName, nextGID)
 	return nil
 }
 
@@ -257,7 +257,7 @@ func readFileContentFromBlocksEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 	bytesRead := int32(0)
 
 	blocks := inode.GetIblock()
-	fmt.Printf("Bloques del inodo: %v\n", blocks[:4])
+	//fmt.Printf("Bloques del inodo: %v\n", blocks[:4])
 
 	// Leer bloques directos (0-11)
 	for i := 0; i < 12 && bytesRead < fileSize; i++ {
@@ -280,16 +280,16 @@ func readFileContentFromBlocksEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 		}
 
 		copy(contentBuffer[bytesRead:bytesRead+bytesToRead], fileBlock.B_content[:bytesToRead])
-
-		// DEBUG: Mostrar qué se leyó
-		blockContent := string(fileBlock.B_content[:bytesToRead])
-		fmt.Printf("\n--- DEBUG BLOQUE %d (num: %d) ---\n", i, blockNum)
-		fmt.Printf("Bytes leídos: %d\n", bytesToRead)
-		fmt.Printf("Contenido del bloque:\n%s\n", blockContent)
-		fmt.Printf("-------------------------------\n")
-
+		/*
+			// DEBUG: Mostrar qué se leyó
+			blockContent := string(fileBlock.B_content[:bytesToRead])
+			fmt.Printf("\n--- DEBUG BLOQUE %d (num: %d) ---\n", i, blockNum)
+			fmt.Printf("Bytes leídos: %d\n", bytesToRead)
+			fmt.Printf("Contenido del bloque:\n%s\n", blockContent)
+			fmt.Printf("-------------------------------\n")
+		*/
 		bytesRead += bytesToRead
-		fmt.Printf("DEBUG: Bloque directo %d leído - %d bytes (total: %d/%d)\n", i, bytesToRead, bytesRead, fileSize)
+		//fmt.Printf("DEBUG: Bloque directo %d leído - %d bytes (total: %d/%d)\n", i, bytesToRead, bytesRead, fileSize)
 	}
 
 	// Leer bloque indirecto simple (índice 12) si es necesario
@@ -342,52 +342,180 @@ func readFileContentFromBlocksEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 	return result, nil
 }
 
-// writeContentToFileEXT3 escribe contenido actualizado al archivo users.txt en EXT3
+// writeContentToFileEXT3 escribe contenido actualizado al archivo users.txt en EXT3 - VERSIÓN CORREGIDA
 func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *estructuraArchivoCarpeta.Inodo, content string, inodeNum int32) error {
 	contentBytes := []byte(content)
 	contentSize := int32(len(contentBytes))
+	/*
+		fmt.Printf("\n=== DEBUG ESCRITURA EXT3 (MKGRP) ===\n")
+		fmt.Printf("Contenido a escribir (%d bytes):\n%s\n", contentSize, content)
+		fmt.Printf("====================================\n\n")
+	*/
+	// Calcular bloques necesarios
+	blocksNeeded := (contentSize + 63) / 64 // Redondear hacia arriba
 
-	// Obtener los bloques actuales del archivo
+	// Obtener bloques actuales
 	blocks := inode.GetIblock()
-
-	// Calcular cuántos bloques necesitamos y verificar límites
-	blocksNeeded := (contentSize + 63) / 64 // Redondear hacia arriba (64 bytes por bloque)
-
-	if blocksNeeded > 16 {
-		return fmt.Errorf("el contenido es demasiado grande: necesita %d bloques, máximo 16", blocksNeeded)
+	directBlocksUsed := int32(0)
+	for i := 0; i < 12; i++ {
+		if blocks[i] != -1 {
+			directBlocksUsed++
+		}
 	}
 
-	// Escribir el contenido en los bloques existentes
-	bytesWritten := int32(0)
-	blockIndex := 0
+	//fmt.Printf("DEBUG: Bloques necesarios: %d, Bloques directos actuales: %d\n", blocksNeeded, directBlocksUsed)
+	//fmt.Printf("DEBUG: Bloques actuales del inodo: %v\n", blocks[:4])
 
-	for bytesWritten < contentSize && blockIndex < 16 {
-		blockNum := blocks[blockIndex]
-		if blockNum == -1 {
-			// Necesitamos asignar un nuevo bloque
-			break
+	// === ASIGNAR BLOQUES DIRECTOS ADICIONALES SI SON NECESARIOS ===
+	for i := int(directBlocksUsed); i < 12 && i < int(blocksNeeded); i++ {
+		newBlockNum, err := findFreeBlockEXT3(file, ext3fs)
+		if err != nil {
+			return fmt.Errorf("no hay bloques libres disponibles: %s", err)
 		}
 
-		// Calcular cuántos bytes escribir en este bloque
+		// VERIFICAR QUE EL BLOQUE NO ESTÉ YA ASIGNADO
+		isAlreadyUsed := false
+		for j := 0; j < i; j++ {
+			if inode.GetIblock()[j] == newBlockNum {
+				isAlreadyUsed = true
+				break
+			}
+		}
+
+		if isAlreadyUsed {
+			fmt.Printf("⚠️  ADVERTENCIA: Bloque %d ya está asignado, buscando otro...\n", newBlockNum)
+			// Marcar como usado para que findFreeBlockEXT3 no lo vuelva a encontrar
+			err = markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
+			if err != nil {
+				return fmt.Errorf("error marcando bloque temporal como usado: %s", err)
+			}
+			i-- // Reintentar con el mismo índice
+			continue
+		}
+
+		inode.SetIblock(i, newBlockNum)
+		err = markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
+		if err != nil {
+			return fmt.Errorf("error marcando bloque como usado: %s", err)
+		}
+		ext3fs.SuperBlock.S_free_blocks_count--
+		//fmt.Printf("✅ Bloque adicional %d asignado en posición %d del inodo %d\n", newBlockNum, i, inodeNum)
+
+	}
+	/*
+		// Imprimir estado final de bloques asignados
+		iblockArray := inode.GetIblock()
+		iblockSlice := iblockArray[:]
+		fmt.Printf("DEBUG: Bloques finales del inodo: %v\n", iblockSlice[:4])
+	*/
+	// === MANEJAR BLOQUE INDIRECTO SIMPLE (índice 12) SI ES NECESARIO ===
+	var apuntador *bloques.BloqueApuntador
+	if blocksNeeded > 12 {
+		if inode.GetIblock()[12] != -1 {
+			indirectBlockNum := inode.GetIblock()[12]
+			apuntador = bloques.NewBloqueApuntador()
+			blockOffset := int64(ext3fs.SuperBlock.S_block_start + (indirectBlockNum * ext3fs.SuperBlock.S_block_s))
+			err := utilitiesP2.ReadStruct(file, blockOffset, apuntador)
+			if err != nil {
+				return fmt.Errorf("error leyendo bloque de apuntadores existente: %s", err)
+			}
+			fmt.Printf("DEBUG: Bloque indirecto existente: %d\n", indirectBlockNum)
+		} else {
+			apuntador = bloques.NewBloqueApuntador()
+			indirectBlockNum, err := findFreeBlockEXT3(file, ext3fs)
+			if err != nil {
+				return fmt.Errorf("no hay bloques libres para bloque de apuntadores: %s", err)
+			}
+			inode.SetIblock(12, indirectBlockNum)
+			err = markBlockAsUsedEXT3(file, ext3fs, indirectBlockNum)
+			if err != nil {
+				return fmt.Errorf("error marcando bloque de apuntadores como usado: %s", err)
+			}
+			ext3fs.SuperBlock.S_free_blocks_count--
+			fmt.Printf("DEBUG: Nuevo bloque indirecto asignado: %d\n", indirectBlockNum)
+
+		}
+
+		for i := 12; i < int(blocksNeeded) && (i-12) < 16; i++ {
+			if apuntador.B_pointers[i-12] == -1 {
+				blockNum, err := findFreeBlockEXT3(file, ext3fs)
+				if err != nil {
+					return fmt.Errorf("no se pudo encontrar un bloque libre: %s", err)
+				}
+				apuntador.B_pointers[i-12] = blockNum
+				err = markBlockAsUsedEXT3(file, ext3fs, blockNum)
+				if err != nil {
+					return fmt.Errorf("error marcando bloque como usado: %s", err)
+				}
+				ext3fs.SuperBlock.S_free_blocks_count--
+				fmt.Printf("DEBUG: Bloque indirecto %d asignado en apuntador[%d]\n", blockNum, i-12)
+			}
+		}
+
+		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (inode.GetIblock()[12] * ext3fs.SuperBlock.S_block_s))
+		err := utilitiesP2.WriteStruct(file, blockOffset, apuntador)
+		if err != nil {
+			return fmt.Errorf("error escribiendo bloque de apuntadores: %s", err)
+		}
+	}
+
+	// === FUNCIÓN HELPER PARA OBTENER NÚMERO DE BLOQUE ===
+	getBlockNumber := func(index int32) int32 {
+		if index < 12 {
+			blockNum := inode.GetIblock()[index]
+			//fmt.Printf("DEBUG: getBlockNumber(%d) = %d (directo)\n", index, blockNum)
+			return blockNum
+		} else if index < 28 && apuntador != nil {
+			blockNum := apuntador.B_pointers[index-12]
+			//fmt.Printf("DEBUG: getBlockNumber(%d) = %d (indirecto)\n", index, blockNum)
+			return blockNum
+		}
+		//fmt.Printf("DEBUG: getBlockNumber(%d) = -1 (no asignado)\n", index)
+		return -1
+	}
+
+	// === ESCRIBIR CONTENIDO COMPLETO EN TODOS LOS BLOQUES ===
+	bytesWritten := int32(0)
+	for blockIndex := 0; blockIndex < int(blocksNeeded); blockIndex++ {
+		blockNum := getBlockNumber(int32(blockIndex))
+		if blockNum == -1 {
+			return fmt.Errorf("bloque %d no asignado correctamente", blockIndex)
+		}
+
+		// VERIFICAR QUE NO SE ESTÁ ESCRIBIENDO AL MISMO BLOQUE DOS VECES
+		for prevIndex := 0; prevIndex < blockIndex; prevIndex++ {
+			prevBlockNum := getBlockNumber(int32(prevIndex))
+			if prevBlockNum == blockNum {
+				return fmt.Errorf("ERROR CRÍTICO: Bloque %d está duplicado en posiciones %d y %d",
+					blockNum, prevIndex, blockIndex)
+			}
+		}
+
 		remainingBytes := contentSize - bytesWritten
-		bytesToWrite := int32(64) // Tamaño del bloque
+		bytesToWrite := int32(64)
 		if remainingBytes < bytesToWrite {
 			bytesToWrite = remainingBytes
 		}
 
-		// Crear el bloque de archivo
+		// Crear y llenar el bloque COMPLETAMENTE LIMPIO
 		fileBlock := &bloques.BloqueArchivo{}
-
-		// Copiar el contenido al bloque
-		copy(fileBlock.B_content[:], contentBytes[bytesWritten:bytesWritten+bytesToWrite])
-
-		// Si no llenamos el bloque completo, llenar el resto con zeros
-		if bytesToWrite < 64 {
-			for i := bytesToWrite; i < 64; i++ {
-				fileBlock.B_content[i] = 0
-			}
+		for i := 0; i < 64; i++ {
+			fileBlock.B_content[i] = 0
 		}
 
+		// Copiar el contenido correspondiente a este bloque
+		if bytesToWrite > 0 {
+			copy(fileBlock.B_content[:bytesToWrite], contentBytes[bytesWritten:bytesWritten+bytesToWrite])
+		}
+		/*
+			// DEBUG: Mostrar qué se está escribiendo
+			blockContent := string(fileBlock.B_content[:bytesToWrite])
+			fmt.Printf("\n--- DEBUG BLOQUE %d (num: %d) ---\n", blockIndex, blockNum)
+			fmt.Printf("Posición en contenido: %d-%d\n", bytesWritten, bytesWritten+bytesToWrite)
+			fmt.Printf("Bytes a escribir: %d\n", bytesToWrite)
+			fmt.Printf("Contenido del bloque:\n%s\n", blockContent)
+			fmt.Printf("-------------------------------\n")
+		*/
 		// Escribir el bloque al disco
 		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
 		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
@@ -396,20 +524,32 @@ func writeContentToFileEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 		}
 
 		bytesWritten += bytesToWrite
-		blockIndex++
+		//fmt.Printf("✅ Bloque %d (físico #%d) escrito: %d bytes (total: %d/%d)\n",
+		//	blockIndex, blockNum, bytesToWrite, bytesWritten, contentSize)
 	}
 
-	// Actualizar el tamaño del archivo en el inodo
+	// === ACTUALIZAR SUPERBLOQUE ===
+	err := utilitiesP2.WriteStruct(file, int64(ext3fs.StartOffset), ext3fs.SuperBlock)
+	if err != nil {
+		return fmt.Errorf("error actualizando superbloque: %s", err)
+	}
+
+	// === ACTUALIZAR INODO ===
 	inode.SetSize(contentSize)
 	inode.UpdateModificationTime()
-
-	// Escribir el inodo actualizado
 	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (inodeNum * ext3fs.SuperBlock.S_inode_s))
-	err := utilitiesP2.WriteStruct(file, inodeOffset, inode)
+	err = utilitiesP2.WriteStruct(file, inodeOffset, inode)
 	if err != nil {
 		return fmt.Errorf("error actualizando inodo: %s", err)
 	}
-
+	/*
+			fmt.Printf("\n=== ESCRITURA COMPLETADA (MKGRP) ===\n")
+			fmt.Printf("Total escrito: %d bytes en %d bloques\n", contentSize, blocksNeeded)
+			iblockArrayFinal := inode.GetIblock()
+			iblockSliceFinal := iblockArrayFinal[:]
+			fmt.Printf("Bloques usados: %v\n", iblockSliceFinal[:blocksNeeded])
+		fmt.Printf("====================================\n\n")
+	*/
 	return nil
 }
 

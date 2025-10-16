@@ -196,14 +196,14 @@ func simulateLossEXT3(partition MountedPartition) error {
 		return fmt.Errorf("error limpiando área de bloques: %s", err)
 	}
 	fmt.Printf("   ✓ Área de bloques limpiada (%d bloques, %d bytes cada uno)\n", ext3fs.SuperBlock.S_blocks_count, ext3fs.SuperBlock.S_block_s)
-
-	fmt.Printf("5. Limpiando área de journaling EXT3...\n")
-	err = clearJournalingArea(file, ext3fs)
-	if err != nil {
-		return fmt.Errorf("error limpiando área de journaling: %s", err)
-	}
-	fmt.Printf("   ✓ Área de journaling limpiada\n")
-
+	/*
+		fmt.Printf("5. Limpiando área de journaling EXT3...\n")
+		err = clearJournalingArea(file, ext3fs)
+		if err != nil {
+			return fmt.Errorf("error limpiando área de journaling: %s", err)
+		}
+		fmt.Printf("   ✓ Área de journaling limpiada\n")
+	*/
 	return nil
 }
 

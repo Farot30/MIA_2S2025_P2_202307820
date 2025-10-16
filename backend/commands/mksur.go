@@ -282,7 +282,7 @@ func userExists(content, username string) bool {
 	lines := strings.Split(content, "\n")
 	fmt.Printf("DEBUG: Verificando si usuario '%s' existe...\n", username)
 
-	for lineNum, line := range lines {
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -290,12 +290,12 @@ func userExists(content, username string) bool {
 
 		// Parsear la línea: ID,TIPO,GRUPO,USUARIO,PASSWORD para usuarios
 		parts := strings.Split(line, ",")
-		fmt.Printf("DEBUG: Línea %d: %s -> %d partes\n", lineNum+1, line, len(parts))
+		//fmt.Printf("DEBUG: Línea %d: %s -> %d partes\n", lineNum+1, line, len(parts))
 
 		if len(parts) >= 5 && parts[1] == "U" {
 			// parts[0] = ID, parts[1] = TIPO (U), parts[2] = GRUPO, parts[3] = USUARIO, parts[4] = PASSWORD
 			existingUser := strings.TrimSpace(parts[3])
-			fmt.Printf("DEBUG: Usuario encontrado: '%s' (buscando: '%s')\n", existingUser, username)
+			//fmt.Printf("DEBUG: Usuario encontrado: '%s' (buscando: '%s')\n", existingUser, username)
 
 			if existingUser == username && parts[0] != "0" {
 				fmt.Printf("DEBUG: ¡Usuario '%s' ya existe!\n", username)

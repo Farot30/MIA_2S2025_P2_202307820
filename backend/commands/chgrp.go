@@ -186,7 +186,7 @@ func CambiarGrupoUsuarioEXT3(partition MountedPartition, username string, groupN
 		return fmt.Errorf("error leyendo contenido de users.txt: %s", err)
 	}
 
-	fmt.Printf("DEBUG: Contenido actual de users.txt:\n%s\n", currentContent)
+	//fmt.Printf("DEBUG: Contenido actual de users.txt:\n%s\n", currentContent)
 
 	// VERIFICAR QUE EL USUARIO EXISTE
 	userLine, userExists := findUserInContent(currentContent, username)
@@ -284,11 +284,11 @@ func extractGroupFromUserLine(userLine string) string {
 func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *estructuraArchivoCarpeta.Inodo, content string, inodeNum int32) error {
 	contentBytes := []byte(content)
 	contentSize := int32(len(contentBytes))
-
-	fmt.Printf("\n=== DEBUG ESCRITURA EXT3 ===\n")
-	fmt.Printf("Contenido a escribir (%d bytes):\n%s\n", contentSize, content)
-	fmt.Printf("============================\n\n")
-
+	/*
+		fmt.Printf("\n=== DEBUG ESCRITURA EXT3 ===\n")
+		fmt.Printf("Contenido a escribir (%d bytes):\n%s\n", contentSize, content)
+		fmt.Printf("============================\n\n")
+	*/
 	// Calcular bloques necesarios
 	blocksNeeded := (contentSize + 63) / 64
 
@@ -301,8 +301,8 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 		}
 	}
 
-	fmt.Printf("DEBUG: Bloques necesarios: %d, Bloques directos actuales: %d\n", blocksNeeded, directBlocksUsed)
-	fmt.Printf("DEBUG: Bloques actuales del inodo: %v\n", blocks[:4])
+	//fmt.Printf("DEBUG: Bloques necesarios: %d, Bloques directos actuales: %d\n", blocksNeeded, directBlocksUsed)
+	//fmt.Printf("DEBUG: Bloques actuales del inodo: %v\n", blocks[:4])
 
 	// === ASIGNAR BLOQUES DIRECTOS ADICIONALES SI SON NECESARIOS ===
 	for i := int(directBlocksUsed); i < 12 && i < int(blocksNeeded); i++ {
@@ -337,17 +337,17 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 			return fmt.Errorf("error marcando bloque como usado: %s", err)
 		}
 		ext3fs.SuperBlock.S_free_blocks_count--
-		fmt.Printf("✅ Bloque adicional %d asignado en posición %d del inodo %d\n", newBlockNum, i, inodeNum)
+		//fmt.Printf("✅ Bloque adicional %d asignado en posición %d del inodo %d\n", newBlockNum, i, inodeNum)
 	}
+	/*
+		// Asignar el array devuelto por GetIblock a una variable
+		iblockArray := inode.GetIblock()
 
-	// Asignar el array devuelto por GetIblock a una variable
-	iblockArray := inode.GetIblock()
+		// Convertir el array en un slice
+		iblockSlice := iblockArray[:]
 
-	// Convertir el array en un slice
-	iblockSlice := iblockArray[:]
-
-	// Ahora puedes usar iblockSlice
-	fmt.Printf("Bloques finales del inodo: %v\n", iblockSlice[:4])
+		// Ahora puedes usar iblockSlice
+		fmt.Printf("Bloques finales del inodo: %v\n", iblockSlice[:4])*/
 
 	// === MANEJAR BLOQUE INDIRECTO SIMPLE (índice 12) SI ES NECESARIO ===
 	var apuntador *bloques.BloqueApuntador
@@ -406,14 +406,14 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 	getBlockNumber := func(index int32) int32 {
 		if index < 12 {
 			blockNum := inode.GetIblock()[index]
-			fmt.Printf("DEBUG: getBlockNumber(%d) = %d (directo)\n", index, blockNum)
+			//fmt.Printf("DEBUG: getBlockNumber(%d) = %d (directo)\n", index, blockNum)
 			return blockNum
 		} else if index < 28 && apuntador != nil {
 			blockNum := apuntador.B_pointers[index-12]
-			fmt.Printf("DEBUG: getBlockNumber(%d) = %d (indirecto)\n", index, blockNum)
+			//fmt.Printf("DEBUG: getBlockNumber(%d) = %d (indirecto)\n", index, blockNum)
 			return blockNum
 		}
-		fmt.Printf("DEBUG: getBlockNumber(%d) = -1 (no asignado)\n", index)
+		//fmt.Printf("DEBUG: getBlockNumber(%d) = -1 (no asignado)\n", index)
 		return -1
 	}
 
@@ -450,15 +450,15 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 		if bytesToWrite > 0 {
 			copy(fileBlock.B_content[:bytesToWrite], contentBytes[bytesWritten:bytesWritten+bytesToWrite])
 		}
-
-		// DEBUG: Mostrar qué se está escribiendo
-		blockContent := string(fileBlock.B_content[:bytesToWrite])
-		fmt.Printf("\n--- DEBUG BLOQUE %d (num: %d) ---\n", blockIndex, blockNum)
-		fmt.Printf("Posición en contenido: %d-%d\n", bytesWritten, bytesWritten+bytesToWrite)
-		fmt.Printf("Bytes a escribir: %d\n", bytesToWrite)
-		fmt.Printf("Contenido del bloque:\n%s\n", blockContent)
-		fmt.Printf("-------------------------------\n")
-
+		/*
+			// DEBUG: Mostrar qué se está escribiendo
+			blockContent := string(fileBlock.B_content[:bytesToWrite])
+			fmt.Printf("\n--- DEBUG BLOQUE %d (num: %d) ---\n", blockIndex, blockNum)
+			fmt.Printf("Posición en contenido: %d-%d\n", bytesWritten, bytesWritten+bytesToWrite)
+			fmt.Printf("Bytes a escribir: %d\n", bytesToWrite)
+			fmt.Printf("Contenido del bloque:\n%s\n", blockContent)
+			fmt.Printf("-------------------------------\n")
+		*/
 		// Escribir el bloque al disco
 		blockOffset := int64(ext3fs.SuperBlock.S_block_start + (blockNum * ext3fs.SuperBlock.S_block_s))
 		err := utilitiesP2.WriteStruct(file, blockOffset, fileBlock)
@@ -467,8 +467,8 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 		}
 
 		bytesWritten += bytesToWrite
-		fmt.Printf("✅ Bloque %d (físico #%d) escrito: %d bytes (total: %d/%d)\n",
-			blockIndex, blockNum, bytesToWrite, bytesWritten, contentSize)
+		//fmt.Printf("✅ Bloque %d (físico #%d) escrito: %d bytes (total: %d/%d)\n",
+		//	blockIndex, blockNum, bytesToWrite, bytesWritten, contentSize)
 	}
 
 	// === ACTUALIZAR SUPERBLOQUE ===
@@ -489,13 +489,13 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 	fmt.Printf("\n=== ESCRITURA COMPLETADA ===\n")
 	fmt.Printf("Total escrito: %d bytes en %d bloques\n", contentSize, blocksNeeded)
 	// Asignar el array devuelto por GetIblock a una variable
-	iblockArrays := inode.GetIblock()
+	//iblockArrays := inode.GetIblock()
 
 	// Convertir el array en un slice
-	iblockSlices := iblockArrays[:]
+	//iblockSlices := iblockArrays[:]
 
 	// Ahora puedes usar iblockSlice
-	fmt.Printf("Bloques usados: %v\n", iblockSlices[:blocksNeeded])
+	//fmt.Printf("Bloques usados: %v\n", iblockSlices[:blocksNeeded])
 	fmt.Printf("============================\n\n")
 
 	return nil

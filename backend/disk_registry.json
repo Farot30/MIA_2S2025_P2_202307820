@@ -5,40 +5,40 @@
       "path": "/home/farot/Calificacion_MIA/Discos/Disco1.mia",
       "size": 52428800,
       "fit": "F",
-      "created_at": "2025-10-15T23:49:16.951797154-06:00",
-      "last_accessed": "2025-10-15T23:50:11.532532165-06:00"
+      "created_at": "2025-10-16T16:35:05.947116345-06:00",
+      "last_accessed": "2025-10-16T16:37:40.210604926-06:00"
     },
     {
       "name": "Disco2",
       "path": "/home/farot/Calificacion_MIA/Discos/Disco2.mia",
       "size": 52428800,
       "fit": "B",
-      "created_at": "2025-10-15T23:49:17.124759645-06:00",
-      "last_accessed": "2025-10-15T23:50:11.532916093-06:00"
+      "created_at": "2025-10-16T16:35:06.129295565-06:00",
+      "last_accessed": "2025-10-16T16:37:40.211094281-06:00"
     },
     {
       "name": "Disco3",
       "path": "/home/farot/Calificacion_MIA/Discos/Disco3.mia",
       "size": 13631488,
       "fit": "F",
-      "created_at": "2025-10-15T23:49:17.174528891-06:00",
-      "last_accessed": "2025-10-15T23:50:11.533469949-06:00"
+      "created_at": "2025-10-16T16:35:06.183542281-06:00",
+      "last_accessed": "2025-10-16T16:37:40.211371054-06:00"
     },
     {
       "name": "Disco4",
       "path": "/home/farot/Calificacion_MIA/Discos/Disco4.mia",
       "size": 52428800,
       "fit": "F",
-      "created_at": "2025-10-15T23:49:17.36988889-06:00",
-      "last_accessed": "2025-10-15T23:50:11.533734864-06:00"
+      "created_at": "2025-10-16T16:35:06.390691929-06:00",
+      "last_accessed": "2025-10-16T16:37:40.211574479-06:00"
     },
     {
       "name": "Disco5",
       "path": "/home/farot/Calificacion_MIA/Discos/Disco5.mia",
       "size": 20971520,
       "fit": "W",
-      "created_at": "2025-10-15T23:49:17.449706961-06:00",
-      "last_accessed": "2025-10-15T23:50:11.533982109-06:00"
+      "created_at": "2025-10-16T16:35:06.470990227-06:00",
+      "last_accessed": "2025-10-16T16:37:40.211831615-06:00"
     }
   ]
 }

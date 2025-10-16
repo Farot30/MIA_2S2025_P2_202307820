@@ -839,7 +839,7 @@ func findFreeBlockEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) (
 
 		// Si el bit está en 0, el bloque está libre
 		if (bitmap[byteIndex] & (1 << (7 - bitIndex))) == 0 {
-			fmt.Printf("DEBUG findFreeBlock: Bloque libre encontrado: %d\n", i)
+			//fmt.Printf("DEBUG findFreeBlock: Bloque libre encontrado: %d\n", i)
 			return i, nil
 		}
 	}
@@ -902,6 +902,6 @@ func markBlockAsUsedEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem,
 		return fmt.Errorf("error writing bitmap byte: %s", err)
 	}
 
-	fmt.Printf("DEBUG markBlockAsUsed: Bloque %d marcado como usado en bitmap\n", blockNum)
+	//fmt.Printf("DEBUG markBlockAsUsed: Bloque %d marcado como usado en bitmap\n", blockNum)
 	return nil
 }
