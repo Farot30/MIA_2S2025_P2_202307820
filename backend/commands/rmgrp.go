@@ -195,7 +195,7 @@ func removeGroupEXT3(partition MountedPartition, groupName string) error {
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_RMGRP, "users.txt", fmt.Sprintf("Grupo '%s' eliminado por '%s'", groupName, session.GetCurrentSession().Username))
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_RMGRP, "/users.txt", "-")
 
 	return nil
 }

@@ -136,7 +136,7 @@ func readFileFromEXT3(partition MountedPartition, filePath string, sessionInfo *
 	}
 
 	// Registrar la operación en el journal
-	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, fmt.Sprintf("%d", len(content)))
+	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, "-")
 
 	return content, nil
 }
@@ -418,7 +418,7 @@ func readFileFromEXT3WithSession(partition MountedPartition, filePath string, se
 	}
 
 	// Registrar la operación en el journal
-	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, fmt.Sprintf("size=%d", len(content)))
+	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, "-")
 
 	return content, nil
 }

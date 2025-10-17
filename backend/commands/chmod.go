@@ -171,7 +171,7 @@ func chmodInEXT3(partition MountedPartition, targetPath string, permissions [3]b
 		permissionsStr += " -r"
 	}
 
-	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_CHMOD, targetPath, permissionsStr)
+	err = ext3fs.AddJournalEntry(EstructuraExt3P2.OPERATION_CHMOD, targetPath, "")
 	if err != nil {
 		return fmt.Errorf("error registrando operación en journal: %v", err)
 	}
@@ -180,12 +180,11 @@ func chmodInEXT3(partition MountedPartition, targetPath string, permissions [3]b
 	err = executeChmod(file, ext3fs.SuperBlock, targetPath, permissions, recursive, sessionInfo, ext3fs)
 	if err != nil {
 		// Registrar error en journal
-		ext3fs.AddJournalEntry("chmod_error", targetPath, err.Error())
 		return err
 	}
 
 	// Registrar éxito en journal
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHMOD, targetPath, permissionsStr)
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHMOD, targetPath, "-")
 
 	return nil
 }
@@ -318,8 +317,7 @@ func chmodRecursive(file *os.File, superBlock *EstructuraarchivocarpetaP2.SuperB
 
 				// Registrar en journal si es EXT3
 				if ext3fs != nil {
-					permissionsStr := fmt.Sprintf("%d%d%d", permissions[0], permissions[1], permissions[2])
-					LogEXT3Operation(EstructuraExt3P2.OPERATION_CHMOD, entryPath, permissionsStr)
+					LogEXT3Operation(EstructuraExt3P2.OPERATION_CHMOD, entryPath, "-")
 				}
 
 				if entryInode.Itype == 0 { // Es directorio

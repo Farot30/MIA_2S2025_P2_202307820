@@ -151,7 +151,7 @@ func createGroupEXT3(file *os.File, partition MountedPartition, groupName string
 	}
 
 	// REGISTRO EN JOURNAL: Operación completada exitosamente
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/", fmt.Sprintf("Grupo %s creado exitosamente con GID %d", groupName, nextGID))
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKGRP, "/users.txt", "-")
 
 	//fmt.Printf("Grupo '%s' creado en EXT3 con journaling (GID: %d)\n", groupName, nextGID)
 	return nil

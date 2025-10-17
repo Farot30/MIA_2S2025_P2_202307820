@@ -205,7 +205,7 @@ func createDirectoryEXT3(partition MountedPartition, dirPath string, createParen
 		return fmt.Errorf("error creando directorio en sistema EXT3: %s", err)
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirPath, sessionInfo.Username)
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirPath, "-")
 
 	return nil
 }

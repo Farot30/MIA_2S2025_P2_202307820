@@ -207,7 +207,7 @@ func chownInEXT3(partition MountedPartition, targetPath, newOwner string, recurs
 		return err
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHOWN, targetPath, fmt.Sprintf("Nuevo propietario: %s", newOwner))
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHOWN, targetPath, "-")
 
 	return nil
 }

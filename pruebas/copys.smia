@@ -36,3 +36,36 @@ cat -file1=/dir1/destinos/usuarios/macos/archivo1.txt
 move -path=/dir1/destinos/usuarios/macos/archivo1.txt -destino=/home/usuarios
 
 cat -file1=/home/usuarios/archivo1.txt
+
+
+remove -path=/home/usuarios/archivo1.txt
+
+mkfile -path=/dir1/destinos/patato.txt -cont=/home/farot/Descargas/nes.txt
+
+edit -path=/dir1/destinos/patato.txt -contenido=/home/farot/Descargas/hola.txt
+
+rename -path=/dir1/destinos/patato.txt -name=chente.txt
+
+find -path=/ -name=*.txt
+
+mkgrp -name=usuarios
+mkgrp -name=adm
+mkgrp -name=mail
+
+mkusr -user="usuario1" -pass=password -grp=root
+mkusr -user="user1" -pass=abc -grp=usuarios
+mkusr -user="user2" -pass=abc -grp=usuarios
+
+chown -path=/home/usuarios/macos -r -usuario=user1
+
+mkfile -path=/home/usuarios/maco.txt -size=40
+
+rep -id=201A -path=/home/farot/Documentos/p4_r7_ls.jpg -path_file_ls=/home/usuarios -name=ls
+
+mkfile -path=/home/usuarios/macos/lolero.txt -siez=80
+
+chown -path=/home/usuarios/macos/lolero.txt -r -usuario=user1
+
+chmod -path=/dir1/destinos -ugo=755
+
+rename -path=/dir1/destinos/usuarios/macos/archivo1.txt -name=panza.txt

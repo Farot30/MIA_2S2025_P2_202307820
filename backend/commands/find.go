@@ -174,7 +174,7 @@ func findInEXT3(partition MountedPartition, searchPath, searchName string, sessi
 	// Ejecutar búsqueda
 	results, err := executeFind(file, ext3fs.SuperBlock, searchPath, searchName, sessionInfo, ext3fs)
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_FIND, searchPath, "")
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_FIND, searchPath, "-")
 
 	return results, err
 }
@@ -385,16 +385,6 @@ func searchInIndirectBlocks(file *os.File, superBlock *EstructuraarchivocarpetaP
 	}
 
 	return nil
-}
-
-// getEntryType convierte el tipo numérico a string
-func getEntryType(itype int32) string {
-	if itype == 0 {
-		return "directory"
-	} else if itype == 1 {
-		return "file"
-	}
-	return "unknown"
 }
 
 // displayFindResults muestra los resultados de la búsqueda

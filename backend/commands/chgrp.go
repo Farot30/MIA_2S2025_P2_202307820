@@ -211,7 +211,7 @@ func CambiarGrupoUsuarioEXT3(partition MountedPartition, username string, groupN
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHGRP, "/users.txt", fmt.Sprintf("Usuario %s cambiado al grupo %s", username, groupName))
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_CHGRP, "/users.txt", "-")
 
 	fmt.Printf("Grupo del usuario '%s' cambiado exitosamente de '%s' a '%s'\n",
 		username, extractGroupFromUserLine(userLine), groupName)
@@ -375,8 +375,7 @@ func writeContentToFileUserEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3File
 			ext3fs.SuperBlock.S_free_blocks_count--
 			fmt.Printf("DEBUG: Nuevo bloque indirecto asignado: %d\n", indirectBlockNum)
 
-			LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt",
-				fmt.Sprintf("Bloque indirecto %d asignado", indirectBlockNum))
+			LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, "/users.txt", "-")
 		}
 
 		for i := 12; i < int(blocksNeeded) && (i-12) < 16; i++ {

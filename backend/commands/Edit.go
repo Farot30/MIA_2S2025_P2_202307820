@@ -242,7 +242,7 @@ func EditFile(partition MountedPartition, filePath string, newContent string, se
 		}
 
 		// Registrar la operación en el journal
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, filePath, newContent)
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_EDIT, filePath, "-")
 
 		// Actualizar el superbloque
 		err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+fileInodeNum*ext3fs.SuperBlock.S_inode_s), fileInode)

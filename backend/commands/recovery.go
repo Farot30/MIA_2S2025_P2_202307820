@@ -162,10 +162,6 @@ func recoverEXT3FileSystem(partition MountedPartition) error {
 
 	fmt.Printf("6. Registrando recuperación en el journal...\n")
 
-	// Registrar la operación de recuperación en el journal
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, "/",
-		fmt.Sprintf("Sistema recuperado exitosamente. %d operaciones procesadas", len(journalEntries)))
-
 	return nil
 }
 

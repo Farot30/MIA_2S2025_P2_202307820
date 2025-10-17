@@ -232,7 +232,6 @@ func mountPrimaryPartition(diskPath, partitionName string, partitionIndex int, p
 	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
 		_, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
 		if err == nil {
-			LogEXT3Operation(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición montada: %s", partitionName))
 		}
 	}
 
@@ -318,7 +317,6 @@ func mountLogicalPartition(diskPath, partitionName string, partitionStart int32,
 	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
 		_, err := EstructuraExt3P2.ReadEXT3FileSystem(diskPath, partitionStart)
 		if err == nil {
-			LogEXT3Operation(EstructuraExt3P2.OPERATION_MOUNT, "/", fmt.Sprintf("Partición lógica montada: %s", partitionName))
 		}
 	}
 
@@ -536,7 +534,6 @@ func UNMOUNT(args []string) {
 	if err == nil && fsType == estructuraArchivoCarpeta.EXT3_FILESYSTEM_TYPE {
 		_, err := EstructuraExt3P2.ReadEXT3FileSystem(MountedPartition.Path, MountedPartition.Start)
 		if err == nil {
-			LogEXT3Operation(EstructuraExt3P2.OPERATION_UNMOUNT, "/", fmt.Sprintf("Partición desmontada: %s", MountedPartition.Name))
 		}
 	}
 

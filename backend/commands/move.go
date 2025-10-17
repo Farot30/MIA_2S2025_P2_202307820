@@ -170,9 +170,6 @@ func moveInEXT3(file *os.File, partition MountedPartition, sourcePath, destPath 
 	if err != nil {
 		return fmt.Errorf("no se pudo leer el sistema EXT3: %v", err)
 	}
-
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, sourcePath, fmt.Sprintf("Iniciando movimiento de '%s' a '%s'", sourcePath, destPath))
-
 	// Separar directorio padre y nombre del elemento fuente
 	sourceDir := filepath.Dir(sourcePath)
 	sourceName := filepath.Base(sourcePath)
@@ -310,7 +307,7 @@ func moveFileInEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, sour
 		return fmt.Errorf("no se pudo remover entrada del directorio fuente: %v", err)
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, fileName, "Archivo movido exitosamente")
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, fileName, "-")
 
 	fmt.Printf("[MOVE-FILE-EXT3] Archivo movido exitosamente\n")
 	return nil
@@ -350,7 +347,7 @@ func moveDirectoryInEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem,
 		return fmt.Errorf("no se pudo remover entrada del directorio fuente: %v", err)
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, dirName, "Directorio movido exitosamente")
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MOVE, dirName, "-")
 
 	fmt.Printf("[MOVE-DIR-EXT3] Directorio movido exitosamente (nuevo inodo: %d)\n", newDirInodeNum)
 	return nil

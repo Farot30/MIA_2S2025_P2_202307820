@@ -24,31 +24,30 @@ type Journal struct {
 
 const (
 	// Tipos de operaciones para el journal
-	OPERATION_MKDIR    = "mkdir"
-	OPERATION_MKFILE   = "mkfile"
-	OPERATION_RMDIR    = "rmdir"
-	OPERATION_RMFILE   = "rmfile"
-	OPERATION_RMGRP    = "rmgrp"
-	OPERATION_RMUSR    = "rmusr"
-	OPERATION_EDIT     = "edit"
-	OPERATION_RENAME   = "rename"
-	OPERATION_CHMOD    = "chmod"
-	OPERATION_CHOWN    = "chown"
-	OPERATION_CHGRP    = "chgrp"
-	OPERATION_MKGRP    = "mkgrp"
-	OPERATION_MKUSR    = "mkusr"
-	OPERATION_LOGIN    = "login"
-	OPERATION_LOGOUT   = "logout"
-	OPERATION_RECOVERY = "recovery"
-	OPERATION_FORMAT   = "format"
-	OPERATION_READ     = "read"
-	OPERATION_FIND     = "find"
-	OPERATION_COPY     = "copy"
-	OPERATION_MOVE     = "move"
-	OPERATION_MOUNT    = "mount"
-	OPERATION_UNMOUNT  = "unmount"
-	OPERATION_LOSS     = "loss"
-	OPERATION_CAT      = "cat"
+	OPERATION_MKDIR   = "mkdir"
+	OPERATION_MKFILE  = "mkfile"
+	OPERATION_RMDIR   = "rmdir"
+	OPERATION_RMFILE  = "rmfile"
+	OPERATION_RMGRP   = "rmgrp"
+	OPERATION_RMUSR   = "rmusr"
+	OPERATION_EDIT    = "edit"
+	OPERATION_RENAME  = "rename"
+	OPERATION_CHMOD   = "chmod"
+	OPERATION_CHOWN   = "chown"
+	OPERATION_CHGRP   = "chgrp"
+	OPERATION_MKGRP   = "mkgrp"
+	OPERATION_MKUSR   = "mkusr"
+	OPERATION_LOGIN   = "login"
+	OPERATION_LOGOUT  = "logout"
+	OPERATION_FORMAT  = "format"
+	OPERATION_READ    = "read"
+	OPERATION_FIND    = "find"
+	OPERATION_COPY    = "copy"
+	OPERATION_MOVE    = "move"
+	OPERATION_MOUNT   = "mount"
+	OPERATION_UNMOUNT = "unmount"
+	OPERATION_LOSS    = "loss"
+	OPERATION_CAT     = "cat"
 )
 
 // Variable global para el tamaño del journal calculado dinámicamente
@@ -62,31 +61,30 @@ func GetJournalSize() int32 {
 // isValidOperation verifica si una operación es válida
 func isValidOperation(operation string) bool {
 	validOps := map[string]bool{
-		OPERATION_MKDIR:    true,
-		OPERATION_MKFILE:   true,
-		OPERATION_RMDIR:    true,
-		OPERATION_RMFILE:   true,
-		OPERATION_RMGRP:    true,
-		OPERATION_RMUSR:    true,
-		OPERATION_EDIT:     true,
-		OPERATION_RENAME:   true,
-		OPERATION_CHMOD:    true,
-		OPERATION_CHOWN:    true,
-		OPERATION_CHGRP:    true,
-		OPERATION_MKGRP:    true,
-		OPERATION_MKUSR:    true,
-		OPERATION_LOGIN:    true,
-		OPERATION_LOGOUT:   true,
-		OPERATION_RECOVERY: true,
-		OPERATION_FORMAT:   true,
-		OPERATION_READ:     true,
-		OPERATION_FIND:     true,
-		OPERATION_COPY:     true,
-		OPERATION_MOVE:     true,
-		OPERATION_MOUNT:    true,
-		OPERATION_UNMOUNT:  true,
-		OPERATION_LOSS:     true,
-		OPERATION_CAT:      true,
+		OPERATION_MKDIR:   true,
+		OPERATION_MKFILE:  true,
+		OPERATION_RMDIR:   true,
+		OPERATION_RMFILE:  true,
+		OPERATION_RMGRP:   true,
+		OPERATION_RMUSR:   true,
+		OPERATION_EDIT:    true,
+		OPERATION_RENAME:  true,
+		OPERATION_CHMOD:   true,
+		OPERATION_CHOWN:   true,
+		OPERATION_CHGRP:   true,
+		OPERATION_MKGRP:   true,
+		OPERATION_MKUSR:   true,
+		OPERATION_LOGIN:   true,
+		OPERATION_LOGOUT:  true,
+		OPERATION_FORMAT:  true,
+		OPERATION_READ:    true,
+		OPERATION_FIND:    true,
+		OPERATION_COPY:    true,
+		OPERATION_MOVE:    true,
+		OPERATION_MOUNT:   true,
+		OPERATION_UNMOUNT: true,
+		OPERATION_LOSS:    true,
+		OPERATION_CAT:     true,
 	}
 	return validOps[operation]
 }
@@ -325,8 +323,6 @@ func (fs *EXT3FileSystem) RecoverFromJournal() error {
 		return nil
 	}
 
-	// Añadir entrada de inicio de recuperación al journal
-	err = fs.AddJournalEntry(OPERATION_RECOVERY, "/", "Iniciando recuperación del sistema")
 	if err != nil {
 		return err
 	}
@@ -352,8 +348,6 @@ func (fs *EXT3FileSystem) RecoverFromJournal() error {
 		}
 	}
 
-	// Añadir entrada de finalización de recuperación al journal
-	err = fs.AddJournalEntry(OPERATION_RECOVERY, "/", "Recuperación completada")
 	if err != nil {
 		return err
 	}
@@ -382,8 +376,6 @@ func GetJournalOperationName(operation string) string {
 		return "Cambiar propietario"
 	case OPERATION_CHGRP:
 		return "Cambiar grupo"
-	case OPERATION_RECOVERY:
-		return "Recuperación"
 	case OPERATION_FORMAT:
 		return "Formateo"
 	case OPERATION_LOGIN:
@@ -410,8 +402,6 @@ func GetJournalOperationName(operation string) string {
 		return "Montar partición"
 	case OPERATION_UNMOUNT:
 		return "Desmontar partición"
-	case OPERATION_LOSS:
-		return "Pérdida de datos"
 	case OPERATION_CAT:
 		return "Leer contenido"
 	default:

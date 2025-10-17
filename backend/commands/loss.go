@@ -166,9 +166,6 @@ func simulateLossEXT3(partition MountedPartition) error {
 		return fmt.Errorf("la partición no es un sistema de archivos EXT3")
 	}
 
-	// Registrar en el journal antes de la pérdida
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_LOSS, "/", "Simulando pérdida del sistema de archivos")
-
 	fmt.Printf("1. Limpiando bitmap de inodos EXT3...\n")
 	err = clearBitmapInodes(file, ext3fs.SuperBlock.S_bm_inode_start, ext3fs.SuperBlock.S_inodes_count)
 	if err != nil {

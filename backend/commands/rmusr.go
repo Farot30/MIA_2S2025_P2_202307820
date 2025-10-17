@@ -191,7 +191,7 @@ func removeUserEXT3(partition MountedPartition, username string) error {
 		return fmt.Errorf("error escribiendo contenido actualizado: %s", err)
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_RMUSR, "users.txt", fmt.Sprintf("Usuario '%s' eliminado por '%s'", username, session.GetCurrentSession().Username))
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_RMUSR, "/users.txt", "-")
 
 	return nil
 }

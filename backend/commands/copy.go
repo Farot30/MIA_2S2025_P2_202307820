@@ -110,10 +110,6 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 		return fmt.Errorf("no se pudo leer el sistema EXT3: %v", err)
 	}
 
-	// REGISTRO EN JOURNAL: Inicio de operación de copia
-	copyInfo := fmt.Sprintf("user=%s src=%s dst=%s", sessionInfo.Username, sourcePath, destPath)
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_start: "+copyInfo)
-
 	// Separar directorio padre y nombre del elemento fuente
 	sourceDir := filepath.Dir(sourcePath)
 	sourceName := filepath.Base(sourcePath)
@@ -121,14 +117,12 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 	// Buscar el directorio padre del elemento fuente
 	sourceDirInodeNum, err := findDirectoryInEXT3ForCopy(file, ext3fs, sourceDir)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: source directory not found")
 		return fmt.Errorf("no se pudo encontrar el directorio padre fuente '%s': %v", sourceDir, err)
 	}
 
 	// Buscar el directorio de destino
 	destDirInodeNum, err := findDirectoryInEXT3ForCopy(file, ext3fs, destPath)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: destination directory not found")
 		return fmt.Errorf("no se pudo encontrar el directorio destino '%s': %v", destPath, err)
 	}
 
@@ -149,14 +143,12 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 	// Verificar permisos de escritura en el directorio destino
 	canWrite, err := sessionP2.CheckPermissions(destDirInode, sessionP2.WRITE)
 	if err != nil || !canWrite {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, destPath, "copy_error: no write permissions")
 		return fmt.Errorf("no tiene permisos de escritura en el directorio destino '%s'", destPath)
 	}
 
 	// Buscar el elemento a copiar en el directorio fuente
 	sourceInodeNum, err := findFileInDirectoryEXT3ForCopy(file, ext3fs, sourceDirInode, sourceName)
 	if err != nil || sourceInodeNum == -1 {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: source file not found")
 		return fmt.Errorf("no se pudo encontrar '%s' en '%s'", sourceName, sourceDir)
 	}
 
@@ -170,7 +162,6 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 	// Verificar permisos de lectura en el elemento fuente
 	canRead, err := sessionP2.CheckPermissions(sourceInode, sessionP2.READ)
 	if err != nil || !canRead {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: no read permissions")
 		return fmt.Errorf("no tiene permisos de lectura sobre el elemento '%s'", sourceName)
 	}
 
@@ -183,12 +174,7 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 		err = fmt.Errorf("tipo de inodo no reconocido: %d", sourceInode.Itype)
 	}
 
-	// REGISTRO EN JOURNAL: Resultado de la operación
-	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_error: "+err.Error())
-	} else {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, sourcePath, "copy_success: "+destPath)
-	}
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_COPY, sourcePath, "-")
 
 	return err
 }
@@ -197,16 +183,11 @@ func copyInEXT3(partition MountedPartition, sourcePath, destPath string, session
 func copyFileInEXT3Preserve(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, sourceInode *EstructuraarchivocarpetaP2.Inodo, destDirInode *EstructuraarchivocarpetaP2.Inodo, fileName string, sessionInfo *sessionP2.UserSession) error {
 	fmt.Printf("[COPY-FILE-EXT3] Copiando archivo '%s' preservando contenido\n", fileName)
 
-	// REGISTRO EN JOURNAL: Inicio de copia de archivo
-	fileInfo := fmt.Sprintf("size=%d uid=%d gid=%d", sourceInode.Is, sourceInode.Iuid, sourceInode.Igid)
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_copy_start: "+fileInfo)
-
 	// 1. Leer todo el contenido del archivo fuente
 	fileContent, err := ReadFileContentCorrectEXT3(file, ext3fs, sourceInode)
 	if err != nil {
 		fmt.Printf("[WARNING] No se pudo leer contenido de archivo '%s': %v\n", fileName, err)
 		fileContent = []byte{} // Contenido vacío como fallback
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_read_error: "+err.Error())
 	}
 
 	// 2. Crear estructura de contenido para preservación
@@ -222,13 +203,11 @@ func copyFileInEXT3Preserve(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 	// 3. Recrear el archivo en el destino
 	err = createFileWithContentCopyEXT3(file, ext3fs, destDirInode, fileContentStruct)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_create_error: "+err.Error())
 		return fmt.Errorf("no se pudo crear archivo en destino: %v", err)
 	}
 
 	// REGISTRO EN JOURNAL: Éxito en copia de archivo
-	successInfo := fmt.Sprintf("copied %d bytes", len(fileContent))
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "file_copy_success: "+successInfo)
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, fileName, "-")
 
 	fmt.Printf("[COPY-FILE-EXT3] Archivo '%s' copiado exitosamente (%d bytes)\n", fileName, len(fileContent))
 	return nil
@@ -238,27 +217,20 @@ func copyFileInEXT3Preserve(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyst
 func copyDirectoryInEXT3Preserve(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, sourceInode *EstructuraarchivocarpetaP2.Inodo, destDirInode *EstructuraarchivocarpetaP2.Inodo, dirName string, sessionInfo *sessionP2.UserSession) error {
 	fmt.Printf("[COPY-DIR-EXT3] Copiando directorio '%s' usando estrategia de preservación\n", dirName)
 
-	// REGISTRO EN JOURNAL: Inicio de copia de directorio
-	dirInfo := fmt.Sprintf("uid=%d gid=%d", sourceInode.Iuid, sourceInode.Igid)
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_copy_start: "+dirInfo)
-
 	// 1. Guardar todo el contenido del directorio recursivamente
 	dirContent, err := saveDirectoryContentCopyEXT3(file, ext3fs, sourceInode, dirName)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_save_error: "+err.Error())
 		return fmt.Errorf("no se pudo guardar contenido del directorio: %v", err)
 	}
 
 	// 2. Recrear el directorio en el destino (SIN eliminar el original)
 	newDirInodeNum, err := createDirectoryWithContentCopyEXT3(file, ext3fs, destDirInode, dirContent, sessionInfo)
 	if err != nil {
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_create_error: "+err.Error())
 		return fmt.Errorf("no se pudo recrear directorio en destino: %v", err)
 	}
 
 	// REGISTRO EN JOURNAL: Éxito en copia de directorio
-	successInfo := fmt.Sprintf("new_inode=%d children=%d", newDirInodeNum, len(dirContent.Children))
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "dir_copy_success: "+successInfo)
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, dirName, "-")
 
 	fmt.Printf("[COPY-DIR-EXT3] Directorio '%s' copiado exitosamente (nuevo inodo: %d)\n", dirName, newDirInodeNum)
 	return nil
@@ -284,7 +256,8 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 
 		err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_block_start+blockNum*ext3fs.SuperBlock.S_block_s), block)
 		if err != nil {
-			return nil, fmt.Errorf("error leyendo bloque del directorio: %v", err)
+			fmt.Printf("[WARNING] Error leyendo bloque %d del directorio '%s': %v\n", blockNum, dirName, err)
+			continue
 		}
 
 		// Procesar cada entrada del bloque
@@ -297,33 +270,48 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 					continue
 				}
 
+				fmt.Printf("[SAVE-CONTENT-EXT3] Procesando entrada: '%s' (inodo: %d)\n", entryName, entryInodeNum)
+
 				// Leer el inodo de la entrada
 				entryInode := &EstructuraarchivocarpetaP2.Inodo{}
 				err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+entryInodeNum*ext3fs.SuperBlock.S_inode_s), entryInode)
 				if err != nil {
-					fmt.Printf("[WARNING] No se pudo leer inodo de '%s': %v\n", entryName, err)
-					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "inode_read_error: "+err.Error())
+					fmt.Printf("[WARNING] Error leyendo inodo %d para '%s': %v\n", entryInodeNum, entryName, err)
 					continue
 				}
 
-				// Verificar permisos de lectura antes de copiar
+				// Verificar permisos de lectura
 				canRead, err := sessionP2.CheckPermissions(entryInode, sessionP2.READ)
 				if err != nil || !canRead {
-					fmt.Printf("[WARNING] Sin permisos de lectura para '%s', saltando...\n", entryName)
-					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "no_read_permissions")
+					fmt.Printf("[WARNING] Sin permisos de lectura para '%s'\n", entryName)
 					continue
 				}
 
-				if entryInode.Itype == 1 { // Archivo
-					// Leer contenido del archivo
-					fileContent, err := ReadFileContentCorrectEXT3(file, ext3fs, entryInode)
+				if entryInode.Itype == 0 { // Es un directorio
+					fmt.Printf("[SAVE-DIR-EXT3] Guardando subdirectorio '%s' recursivamente\n", entryName)
+
+					// Guardar recursivamente el contenido del subdirectorio
+					subDirContent, err := saveDirectoryContentCopyEXT3(file, ext3fs, entryInode, entryName)
 					if err != nil {
-						fmt.Printf("[WARNING] No se pudo leer contenido de archivo '%s': %v\n", entryName, err)
-						fileContent = []byte{} // Contenido vacío como fallback
-						LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "file_content_read_error: "+err.Error())
+						fmt.Printf("[WARNING] Error guardando subdirectorio '%s': %v\n", entryName, err)
+						continue
 					}
 
-					dirContent.Children[entryName] = &DirectoryContent{
+					dirContent.Children[entryName] = subDirContent
+					fmt.Printf("[SAVE-DIR-EXT3] Subdirectorio '%s' guardado recursivamente\n", entryName)
+
+				} else if entryInode.Itype == 1 { // Es un archivo
+					fmt.Printf("[SAVE-FILE-EXT3] Guardando archivo '%s'\n", entryName)
+
+					// Leer el contenido del archivo
+					fileContent, err := ReadFileContentCorrectEXT3(file, ext3fs, entryInode)
+					if err != nil {
+						fmt.Printf("[WARNING] Error leyendo contenido de archivo '%s': %v\n", entryName, err)
+						fileContent = []byte{} // Contenido vacío como fallback
+					}
+
+					// Crear estructura de contenido para el archivo
+					fileContentStruct := &DirectoryContent{
 						Name:        entryName,
 						IsDirectory: false,
 						Permissions: entryInode.Iperm,
@@ -332,30 +320,17 @@ func saveDirectoryContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 						Content:     fileContent,
 					}
 
-					// Registro en journal de archivo guardado
-					saveInfo := fmt.Sprintf("size=%d", len(fileContent))
-					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "file_saved: "+saveInfo)
-
+					dirContent.Children[entryName] = fileContentStruct
 					fmt.Printf("[SAVE-FILE-EXT3] Archivo '%s' guardado (%d bytes)\n", entryName, len(fileContent))
-
-				} else if entryInode.Itype == 0 { // Directorio
-					// Guardar recursivamente
-					subDirContent, err := saveDirectoryContentCopyEXT3(file, ext3fs, entryInode, entryName)
-					if err != nil {
-						fmt.Printf("[WARNING] No se pudo guardar subdirectorio '%s': %v\n", entryName, err)
-						LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "subdir_save_error: "+err.Error())
-						continue
-					}
-
-					dirContent.Children[entryName] = subDirContent
-
-					// Registro en journal de directorio guardado
-					LogEXT3Operation(EstructuraExt3P2.OPERATION_RECOVERY, entryName, "dir_saved_recursive")
-
-					fmt.Printf("[SAVE-DIR-EXT3] Directorio '%s' guardado recursivamente\n", entryName)
 				}
 			}
 		}
+	}
+
+	// TODO: Manejar bloques indirectos si es necesario
+	if dirInode.Iblock[12] != -1 {
+		fmt.Printf("[SAVE-CONTENT-EXT3] Procesando bloques indirectos para '%s'\n", dirName)
+		// Implementar lectura de bloques indirectos si es necesario
 	}
 
 	fmt.Printf("[SAVE-CONTENT-EXT3] Contenido del directorio '%s' guardado (%d elementos)\n", dirName, len(dirContent.Children))
@@ -381,45 +356,68 @@ func createDirectoryWithContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.
 
 	// Recrear todo el contenido
 	for name, content := range dirContent.Children {
+		fmt.Printf("[CREATE-CONTENT-EXT3] Recreando elemento: '%s' (es directorio: %t)\n", name, content.IsDirectory)
+
 		if content.IsDirectory {
 			// Recrear subdirectorio recursivamente
+			fmt.Printf("[CREATE-CONTENT-EXT3] Recreando subdirectorio '%s' recursivamente\n", name)
+
 			_, err := createDirectoryWithContentCopyEXT3(file, ext3fs, newDirInode, content, sessionInfo)
 			if err != nil {
-				fmt.Printf("[WARNING] No se pudo recrear subdirectorio '%s': %v\n", name, err)
-				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, name, "subdir_recreate_error: "+err.Error())
-			} else {
-				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKDIR, name, "subdir_recreated")
+				fmt.Printf("[WARNING] Error recreando subdirectorio '%s': %v\n", name, err)
+				continue
 			}
+
+			fmt.Printf("[CREATE-CONTENT-EXT3] Subdirectorio '%s' recreado exitosamente\n", name)
+
 		} else {
 			// Recrear archivo
+			fmt.Printf("[CREATE-CONTENT-EXT3] Recreando archivo '%s' (%d bytes)\n", name, len(content.Content))
+
 			err := createFileWithContentCopyEXT3(file, ext3fs, newDirInode, content)
 			if err != nil {
-				fmt.Printf("[WARNING] No se pudo recrear archivo '%s': %v\n", name, err)
-				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, name, "file_recreate_error: "+err.Error())
-			} else {
-				recreateInfo := fmt.Sprintf("size=%d", len(content.Content))
-				LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, name, "file_recreated: "+recreateInfo)
+				fmt.Printf("[WARNING] Error recreando archivo '%s': %v\n", name, err)
+				continue
 			}
+
+			fmt.Printf("[CREATE-CONTENT-EXT3] Archivo '%s' recreado exitosamente\n", name)
 		}
+	}
+
+	// Actualizar el inodo del directorio después de agregar todo el contenido
+	err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+newDirInodeNum*ext3fs.SuperBlock.S_inode_s), newDirInode)
+	if err != nil {
+		return -1, fmt.Errorf("error actualizando inodo del directorio: %v", err)
 	}
 
 	fmt.Printf("[CREATE-CONTENT-EXT3] Directorio '%s' recreado exitosamente\n", dirContent.Name)
 	return newDirInodeNum, nil
 }
 
-// createBasicDirectoryCopyEXT3 crea un directorio básico con propiedades específicas (versión EXT3)
+// createBasicDirectoryCopyEXT3 crea un directorio básico con propiedades específicas (versión EXT3) - CORREGIDO
 func createBasicDirectoryCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, parentInode *EstructuraarchivocarpetaP2.Inodo, dirName string, uid, gid int32, permissions [3]byte) (int32, error) {
+	fmt.Printf("\n[CREATE-DIR-EXT3] === Creando directorio básico '%s' ===\n", dirName)
+
 	// Buscar un inodo libre
 	newInodeNum, err := EstructuraExt3P2.FindFreeInodeEXT3(file, ext3fs)
 	if err != nil {
 		return -1, fmt.Errorf("no se pudo encontrar un inodo libre: %v", err)
 	}
+	fmt.Printf("[CREATE-DIR-EXT3] Inodo libre encontrado: %d\n", newInodeNum)
 
 	// Buscar un bloque libre para el directorio
 	newBlockNum, err := findFreeBlockEXT3(file, ext3fs)
 	if err != nil || newBlockNum == -1 {
 		return -1, fmt.Errorf("no se pudo encontrar un bloque libre: %v", err)
 	}
+	fmt.Printf("[CREATE-DIR-EXT3] Bloque libre encontrado: %d\n", newBlockNum)
+
+	// CRÍTICO: Marcar el bloque como usado INMEDIATAMENTE
+	err = markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
+	if err != nil {
+		return -1, fmt.Errorf("error marcando bloque como usado: %v", err)
+	}
+	fmt.Printf("[CREATE-DIR-EXT3] ✓ Bloque %d marcado como usado en bitmap\n", newBlockNum)
 
 	// Crear el inodo del directorio
 	newDirInode := &EstructuraarchivocarpetaP2.Inodo{}
@@ -437,22 +435,50 @@ func createBasicDirectoryCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 		newDirInode.Iblock[i] = -1
 	}
 	newDirInode.Iblock[0] = newBlockNum
+	fmt.Printf("[CREATE-DIR-EXT3] Inodo configurado con bloque %d en posición 0\n", newBlockNum)
 
 	// Crear el bloque del directorio con entradas . y ..
 	dirBlock := BloquesP2.NewBloqueCarpeta()
 	dirBlock.AddEntry(".", newInodeNum)
-	dirBlock.AddEntry("..", getParentInodeNumCopyEXT3(file, ext3fs, parentInode))
+
+	// Obtener el número de inodo del padre correctamente
+	parentInodeNum := getParentInodeNumCopyEXT3(file, ext3fs, parentInode)
+	dirBlock.AddEntry("..", parentInodeNum)
+	fmt.Printf("[CREATE-DIR-EXT3] Entradas '.' y '..' agregadas (padre: %d)\n", parentInodeNum)
 
 	// Escribir el bloque del directorio
-	err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_block_start+newBlockNum*ext3fs.SuperBlock.S_block_s), dirBlock)
+	blockOffset := int64(ext3fs.SuperBlock.S_block_start + newBlockNum*ext3fs.SuperBlock.S_block_s)
+	err = utilitiesP2.WriteStruct(file, blockOffset, dirBlock)
 	if err != nil {
 		return -1, fmt.Errorf("error escribiendo bloque del directorio: %v", err)
 	}
+	fmt.Printf("[CREATE-DIR-EXT3] ✓ Bloque %d escrito en offset %d\n", newBlockNum, blockOffset)
+
+	// CRÍTICO: Marcar el inodo como usado INMEDIATAMENTE
+	err = markInodeAsUsedEXT3(file, ext3fs, newInodeNum)
+	if err != nil {
+		return -1, fmt.Errorf("error marcando inodo como usado: %v", err)
+	}
+	fmt.Printf("[CREATE-DIR-EXT3] ✓ Inodo %d marcado como usado en bitmap\n", newInodeNum)
 
 	// Escribir el inodo del directorio
-	err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+newInodeNum*ext3fs.SuperBlock.S_inode_s), newDirInode)
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + newInodeNum*ext3fs.SuperBlock.S_inode_s)
+	err = utilitiesP2.WriteStruct(file, inodeOffset, newDirInode)
 	if err != nil {
 		return -1, fmt.Errorf("error escribiendo inodo del directorio: %v", err)
+	}
+	fmt.Printf("[CREATE-DIR-EXT3] ✓ Inodo %d escrito en offset %d\n", newInodeNum, inodeOffset)
+
+	// Actualizar contadores del superbloque
+	ext3fs.SuperBlock.S_free_inodes_count--
+	ext3fs.SuperBlock.S_free_blocks_count--
+	fmt.Printf("[CREATE-DIR-EXT3] Contadores actualizados: inodos libres=%d, bloques libres=%d\n",
+		ext3fs.SuperBlock.S_free_inodes_count, ext3fs.SuperBlock.S_free_blocks_count)
+
+	// Escribir superbloque actualizado
+	err = utilitiesP2.WriteStruct(file, int64(ext3fs.StartOffset), ext3fs.SuperBlock)
+	if err != nil {
+		return -1, fmt.Errorf("error actualizando superbloque: %v", err)
 	}
 
 	// Agregar entrada al directorio padre
@@ -460,17 +486,24 @@ func createBasicDirectoryCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3Fi
 	if err != nil {
 		return -1, fmt.Errorf("error agregando entrada al directorio padre: %v", err)
 	}
+	fmt.Printf("[CREATE-DIR-EXT3] ✓ Entrada '%s' agregada al directorio padre\n", dirName)
+
+	fmt.Printf("[CREATE-DIR-EXT3] === Directorio '%s' creado exitosamente (inodo: %d, bloque: %d) ===\n\n",
+		dirName, newInodeNum, newBlockNum)
 
 	return newInodeNum, nil
 }
 
-// createFileWithContentCopyEXT3 crea un archivo con contenido específico (versión EXT3)
+// createFileWithContentCopyEXT3 crea un archivo con contenido específico (versión EXT3) - CORREGIDO
 func createFileWithContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, parentInode *EstructuraarchivocarpetaP2.Inodo, fileContent *DirectoryContent) error {
+	fmt.Printf("\n[CREATE-FILE-EXT3] === Creando archivo '%s' ===\n", fileContent.Name)
+
 	// Buscar un inodo libre
 	newInodeNum, err := EstructuraExt3P2.FindFreeInodeEXT3(file, ext3fs)
 	if err != nil {
 		return fmt.Errorf("no se pudo encontrar un inodo libre: %v", err)
 	}
+	fmt.Printf("[CREATE-FILE-EXT3] Inodo libre encontrado: %d\n", newInodeNum)
 
 	// Crear el inodo del archivo
 	newFileInode := &EstructuraarchivocarpetaP2.Inodo{}
@@ -493,11 +526,28 @@ func createFileWithContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 	if err != nil {
 		return fmt.Errorf("error escribiendo contenido del archivo: %v", err)
 	}
+	fmt.Printf("[CREATE-FILE-EXT3] ✓ Contenido escrito (%d bytes)\n", len(fileContent.Content))
+
+	// CRÍTICO: Marcar el inodo como usado
+	err = markInodeAsUsedEXT3(file, ext3fs, newInodeNum)
+	if err != nil {
+		return fmt.Errorf("error marcando inodo como usado: %v", err)
+	}
+	fmt.Printf("[CREATE-FILE-EXT3] ✓ Inodo %d marcado como usado\n", newInodeNum)
 
 	// Escribir el inodo del archivo
-	err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+newInodeNum*ext3fs.SuperBlock.S_inode_s), newFileInode)
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + newInodeNum*ext3fs.SuperBlock.S_inode_s)
+	err = utilitiesP2.WriteStruct(file, inodeOffset, newFileInode)
 	if err != nil {
 		return fmt.Errorf("error escribiendo inodo del archivo: %v", err)
+	}
+	fmt.Printf("[CREATE-FILE-EXT3] ✓ Inodo %d escrito\n", newInodeNum)
+
+	// Actualizar contadores
+	ext3fs.SuperBlock.S_free_inodes_count--
+	err = utilitiesP2.WriteStruct(file, int64(ext3fs.StartOffset), ext3fs.SuperBlock)
+	if err != nil {
+		return fmt.Errorf("error actualizando superbloque: %v", err)
 	}
 
 	// Agregar entrada al directorio padre
@@ -505,6 +555,8 @@ func createFileWithContentCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 	if err != nil {
 		return fmt.Errorf("error agregando entrada al directorio padre: %v", err)
 	}
+
+	fmt.Printf("[CREATE-FILE-EXT3] === Archivo '%s' creado exitosamente (inodo: %d) ===\n\n", fileContent.Name, newInodeNum)
 
 	return nil
 }
@@ -616,48 +668,132 @@ func getParentInodeNumCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileS
 	return 0 // Por defecto, el directorio raíz
 }
 
-// addEntryToDirectoryCopyEXT3 agrega una entrada a un directorio (versión EXT3)
+// addEntryToDirectoryCopyEXT3 agrega una entrada a un directorio (versión EXT3) - CORREGIDO
 func addEntryToDirectoryCopyEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, dirInode *EstructuraarchivocarpetaP2.Inodo, entryName string, entryInodeNum int32) error {
+	fmt.Printf("\n[ADD-ENTRY-EXT3] === Agregando entrada '%s' (inodo: %d) ===\n", entryName, entryInodeNum)
+
+	// Leer el inodo del directorio padre para obtener su número
+	var parentInodeNum int32 = -1
+	for i := int32(0); i < ext3fs.SuperBlock.S_inodes_count; i++ {
+		testInode := &EstructuraarchivocarpetaP2.Inodo{}
+		inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + i*ext3fs.SuperBlock.S_inode_s)
+		err := utilitiesP2.ReadStruct(file, inodeOffset, testInode)
+		if err == nil && testInode.Iblock[0] == dirInode.Iblock[0] && testInode.Itype == 0 {
+			parentInodeNum = i
+			break
+		}
+	}
+	fmt.Printf("[ADD-ENTRY-EXT3] Directorio padre identificado como inodo %d\n", parentInodeNum)
+
+	// Mostrar bloques actuales del directorio padre
+	fmt.Printf("[ADD-ENTRY-EXT3] Bloques actuales del directorio: ")
+	for i := 0; i < 12 && dirInode.Iblock[i] != -1; i++ {
+		fmt.Printf("%d ", dirInode.Iblock[i])
+	}
+	fmt.Printf("\n")
+
 	// Buscar espacio libre en los bloques existentes
 	for i := 0; i < 12 && dirInode.Iblock[i] != -1; i++ {
 		blockNum := dirInode.Iblock[i]
-		block := &BloquesP2.BloqueCarpeta{}
+		fmt.Printf("[ADD-ENTRY-EXT3] Revisando bloque %d (posición %d)\n", blockNum, i)
 
-		err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_block_start+blockNum*ext3fs.SuperBlock.S_block_s), block)
+		block := &BloquesP2.BloqueCarpeta{}
+		blockOffset := int64(ext3fs.SuperBlock.S_block_start + blockNum*ext3fs.SuperBlock.S_block_s)
+		err := utilitiesP2.ReadStruct(file, blockOffset, block)
 		if err != nil {
+			fmt.Printf("[WARNING] Error leyendo bloque %d: %v\n", blockNum, err)
 			continue
 		}
 
-		if block.AddEntry(entryName, entryInodeNum) {
-			err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_block_start+blockNum*ext3fs.SuperBlock.S_block_s), block)
-			if err != nil {
-				return fmt.Errorf("error escribiendo bloque de directorio: %v", err)
+		// Mostrar entradas existentes en el bloque
+		fmt.Printf("[ADD-ENTRY-EXT3] Entradas en bloque %d: ", blockNum)
+		for j := 0; j < 4; j++ {
+			if !block.IsEntryEmpty(j) {
+				name, inode, _ := block.GetEntry(j)
+				fmt.Printf("[%s:%d] ", name, inode)
+			} else {
+				fmt.Printf("[vacío] ")
 			}
+		}
+		fmt.Printf("\n")
+
+		// Intentar agregar la entrada
+		if block.AddEntry(entryName, entryInodeNum) {
+			// Escribir el bloque actualizado
+			err = utilitiesP2.WriteStruct(file, blockOffset, block)
+			if err != nil {
+				return fmt.Errorf("error escribiendo bloque actualizado: %v", err)
+			}
+
+			fmt.Printf("[ADD-ENTRY-EXT3] ✓ Entrada '%s' agregada exitosamente en bloque existente %d\n\n", entryName, blockNum)
 			return nil
 		}
 	}
 
 	// Si no hay espacio, crear un nuevo bloque
+	fmt.Printf("[ADD-ENTRY-EXT3] No hay espacio en bloques existentes, creando nuevo bloque\n")
+
 	newBlockNum, err := findFreeBlockEXT3(file, ext3fs)
 	if err != nil || newBlockNum == -1 {
 		return fmt.Errorf("no se pudo encontrar un bloque libre: %v", err)
 	}
+	fmt.Printf("[ADD-ENTRY-EXT3] Bloque libre encontrado: %d\n", newBlockNum)
 
+	// CRÍTICO: Marcar el bloque como usado INMEDIATAMENTE antes de escribir
+	err = markBlockAsUsedEXT3(file, ext3fs, newBlockNum)
+	if err != nil {
+		return fmt.Errorf("error marcando bloque como usado: %v", err)
+	}
+	fmt.Printf("[ADD-ENTRY-EXT3] ✓ Bloque %d marcado como usado en bitmap\n", newBlockNum)
+
+	// Crear nuevo bloque y agregar la entrada
 	newBlock := BloquesP2.NewBloqueCarpeta()
-	newBlock.AddEntry(entryName, entryInodeNum)
+	if !newBlock.AddEntry(entryName, entryInodeNum) {
+		return fmt.Errorf("no se pudo agregar entrada al nuevo bloque")
+	}
 
-	err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_block_start+newBlockNum*ext3fs.SuperBlock.S_block_s), newBlock)
+	// Escribir el nuevo bloque
+	newBlockOffset := int64(ext3fs.SuperBlock.S_block_start + newBlockNum*ext3fs.SuperBlock.S_block_s)
+	err = utilitiesP2.WriteStruct(file, newBlockOffset, newBlock)
 	if err != nil {
 		return fmt.Errorf("error escribiendo nuevo bloque de directorio: %v", err)
 	}
+	fmt.Printf("[ADD-ENTRY-EXT3] ✓ Nuevo bloque %d escrito\n", newBlockNum)
 
 	// Asignar el bloque al directorio
+	blockAssigned := false
 	for i := 0; i < 12; i++ {
 		if dirInode.Iblock[i] == -1 {
 			dirInode.Iblock[i] = newBlockNum
+			blockAssigned = true
+			fmt.Printf("[ADD-ENTRY-EXT3] ✓ Nuevo bloque %d asignado en posición %d del inodo\n", newBlockNum, i)
 			break
 		}
 	}
+
+	if !blockAssigned {
+		return fmt.Errorf("no hay espacio para asignar más bloques al directorio")
+	}
+
+	// CRÍTICO: Escribir el inodo actualizado del directorio padre
+	if parentInodeNum != -1 {
+		parentInodeOffset := int64(ext3fs.SuperBlock.S_inode_start + parentInodeNum*ext3fs.SuperBlock.S_inode_s)
+		err = utilitiesP2.WriteStruct(file, parentInodeOffset, dirInode)
+		if err != nil {
+			return fmt.Errorf("error actualizando inodo del directorio padre: %v", err)
+		}
+		fmt.Printf("[ADD-ENTRY-EXT3] ✓ Inodo %d actualizado con nuevo bloque\n", parentInodeNum)
+	}
+
+	// Actualizar contadores
+	ext3fs.SuperBlock.S_free_blocks_count--
+	err = utilitiesP2.WriteStruct(file, int64(ext3fs.StartOffset), ext3fs.SuperBlock)
+	if err != nil {
+		return fmt.Errorf("error actualizando superbloque: %v", err)
+	}
+
+	fmt.Printf("[ADD-ENTRY-EXT3] ✓ Entrada '%s' agregada exitosamente en nuevo bloque %d\n", entryName, newBlockNum)
+	fmt.Printf("[ADD-ENTRY-EXT3] Bloques libres restantes: %d\n\n", ext3fs.SuperBlock.S_free_blocks_count)
 
 	return nil
 }

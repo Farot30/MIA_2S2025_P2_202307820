@@ -300,7 +300,7 @@ func createFileEXT3(partition MountedPartition, filePath string, createParents b
 		return fmt.Errorf("error creando archivo en sistema EXT3: %s", err)
 	}
 
-	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, filePath, fmt.Sprintf("Archivo creado exitosamente: %s", filePath))
+	LogEXT3Operation(EstructuraExt3P2.OPERATION_MKFILE, filePath, string(fileContent))
 
 	return nil
 }

@@ -142,7 +142,7 @@ func RemoveInEXT3(partition MountedPartition, path string, sessionInfo *session.
 	}, path, sessionInfo)
 
 	// Registrar el éxito en el journal
-	LogEXT3Operation(operation, path, "")
+	LogEXT3Operation(operation, path, "-")
 	return nil
 }
 

@@ -62,6 +62,8 @@ func RenameFileOrDirectory(partition MountedPartition, path string, newName stri
 	}
 	defer file.Close()
 
+	fmt.Printf("Comenzando rename de archivo o directorio\n")
+
 	superBlock := &EstructuraarchivocarpetaP2.SuperBloque{}
 	err = utilitiesP2.ReadStruct(file, int64(partition.Start), superBlock)
 	if err != nil {
@@ -83,6 +85,8 @@ func RenameFileOrDirectory(partition MountedPartition, path string, newName stri
 	default:
 		return fmt.Errorf("sistema de archivos no soportado: %s", partition.Type)
 	}
+	// Determinar el sistema de archivos
+	fmt.Printf("sistema de archivos encontrado: %d\n", fileSystem)
 
 	switch fileSystem {
 	case 2:
@@ -160,59 +164,86 @@ func RenameFileOrDirectory(partition MountedPartition, path string, newName stri
 	case 3:
 		ext3fs, err := EstructuraExt3P2.ReadEXT3FileSystem(partition.Path, partition.Start)
 		if err != nil {
+			fmt.Printf("[DEBUG] Error leyendo EXT3: %v\n", err)
 			return fmt.Errorf("error al leer el sistema EXT3: %v", err)
 		}
 
+		//fmt.Printf("[DEBUG] Buscando directorio padre '%s'\n", dirPath)
 		parentInodeNum, err := findDirectoryInEXT3(file, ext3fs, dirPath)
 		if err != nil {
+			fmt.Printf("[DEBUG] Error buscando directorio padre: %v\n", err)
 			return fmt.Errorf("error al buscar el directorio padre: %v", err)
 		}
+		//fmt.Printf("[DEBUG] parentInodeNum: %d\n", parentInodeNum)
 
 		parentInode := &EstructuraarchivocarpetaP2.Inodo{}
-		err = utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+parentInodeNum*ext3fs.SuperBlock.S_inode_s), parentInodeNum)
+		err = utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+parentInodeNum*ext3fs.SuperBlock.S_inode_s), parentInode)
 		if err != nil {
+			fmt.Printf("[DEBUG] Error leyendo inodo del directorio padre: %v\n", err)
 			return fmt.Errorf("error al leer el inodo del directorio padre: %v", err)
 		}
 
+		//fmt.Printf("[DEBUG] Buscando archivo '%s' en el directorio padre\n", fileName)
 		fileInodeNum, err := findFileInDirectoryEXT3(file, ext3fs, parentInode, fileName)
 		if err != nil {
+			fmt.Printf("[DEBUG] Error buscando archivo: %v\n", err)
 			return fmt.Errorf("error al buscar el archivo: %v", err)
 		}
+		//fmt.Printf("[DEBUG] fileInodeNum: %d\n", fileInodeNum)
 		if fileInodeNum == -1 {
+			fmt.Printf("[DEBUG] El archivo '%s' no existe en el directorio padre\n", fileName)
 			return fmt.Errorf("el archivo '%s' no existe", fileName)
 		}
 
 		fileInode := &EstructuraarchivocarpetaP2.Inodo{}
 		err = utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_inode_start+fileInodeNum*ext3fs.SuperBlock.S_inode_s), fileInode)
 		if err != nil {
+			fmt.Printf("[DEBUG] Error leyendo inodo del archivo: %v\n", err)
 			return fmt.Errorf("error al leer el inodo del archivo: %v", err)
 		}
 
+		//fmt.Printf("[DEBUG] Tipo de inodo: %d\n", fileInode.Itype)
 		if fileInode.Itype != 1 { // 1 = archivo
+			fmt.Printf("[DEBUG] El inodo no es un archivo\n")
 			return fmt.Errorf("'%s' no es un archivo", fileName)
 		}
 
 		canRead, err := sessionP2.CheckPermissions(fileInode, sessionP2.READ)
+		//fmt.Printf("[DEBUG] Permiso de lectura: %v, err: %v\n", canRead, err)
 		if err != nil || !canRead {
 			return fmt.Errorf("el usuario no tiene permisos de lectura sobre el archivo")
 		}
 
 		canWrite, err := sessionP2.CheckPermissions(fileInode, sessionP2.WRITE)
+		//fmt.Printf("[DEBUG] Permiso de escritura: %v, err: %v\n", canWrite, err)
 		if err != nil || !canWrite {
 			return fmt.Errorf("el usuario no tiene permisos de escritura sobre el archivo")
 		}
 
+		switch fileInode.Itype {
+		case 0:
+			fmt.Printf("Depuración: Renombrando carpeta '%s'\n", fileName)
+		case 1:
+			fmt.Printf("Depuración: Renombrando archivo '%s'\n", fileName)
+		default:
+			return fmt.Errorf("tipo de inodo desconocido para '%s'", fileName)
+		}
+
+		//fmt.Printf("[DEBUG] Actualizando nombre en el bloque de directorio\n")
 		err = updateFileNameInDirectoryEXT3(file, ext3fs, parentInode, fileName, newName)
 		if err != nil {
+			fmt.Printf("[DEBUG] Error renombrando archivo: %v\n", err)
 			return fmt.Errorf("error al renombrar el archivo: %v", err)
 		}
 
-		err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+parentInodeNum*ext3fs.SuperBlock.S_inode_s), parentInodeNum)
+		//fmt.Printf("[DEBUG] Escribiendo inodo actualizado del directorio padre\n")
+		err = utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+parentInodeNum*ext3fs.SuperBlock.S_inode_s), parentInode)
 		if err != nil {
+			fmt.Printf("[DEBUG] Error actualizando inodo del directorio padre: %v\n", err)
 			return fmt.Errorf("error al actualizar el inodo del directorio padre: %v", err)
 		}
 
-		LogEXT3Operation(EstructuraExt3P2.OPERATION_RENAME, path, fmt.Sprintf("Renombrado a '%s'", newName))
+		LogEXT3Operation(EstructuraExt3P2.OPERATION_RENAME, path, "-")
 
 		return nil
 	}
@@ -324,12 +355,15 @@ func updateFileNameInDirectoryEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 		if err != nil {
 			return fmt.Errorf("error al leer el bloque de directorio: %v", err)
 		}
+		found := false
 
 		for j := 0; j < len(dirBlock.B_content); j++ {
 			entry := &dirBlock.B_content[j]
-			if string(entry.B_name[:]) == oldName {
+			entryName := strings.TrimRight(string(entry.B_name[:]), "\x00")
+			if entryName == oldName {
+				found = true
 				// Depuración: Verificar el nombre antes de actualizar
-				fmt.Printf("Depuración: Nombre encontrado en el bloque: '%s'\n", string(entry.B_name[:]))
+				fmt.Printf("Depuración: Nombre '%s' encontrado en la entrada %d\n", oldName, j)
 
 				// Limpiar el espacio del nombre anterior
 				for k := range entry.B_name {
@@ -343,13 +377,16 @@ func updateFileNameInDirectoryEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3F
 				fmt.Printf("Depuración: Nombre actualizado en el bloque: '%s'\n", string(entry.B_name[:]))
 
 				// Escribir el bloque actualizado de vuelta al disco
-				err := utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_block_start+dirInode.Iblock[i]*ext3fs.SuperBlock.S_block_s), dirBlock)
-				if err != nil {
+				if err := utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_block_start+dirInode.Iblock[i]*ext3fs.SuperBlock.S_block_s), dirBlock); err != nil {
 					return fmt.Errorf("error al escribir el bloque de directorio actualizado: %v", err)
 				}
 
 				return nil
 			}
+		}
+		if !found {
+			// Depuración: Nombre no encontrado en el bloque
+			fmt.Printf("Depuración: Nombre '%s' no encontrado en el bloque\n", oldName)
 		}
 	}
 	if dirInode.Iblock[12] != -1 {
