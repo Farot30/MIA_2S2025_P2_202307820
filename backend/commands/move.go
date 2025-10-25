@@ -75,7 +75,7 @@ func moveIN(partition MountedPartition, sourcePath, destPath string, sessionInfo
 		return fmt.Errorf("no se pudo detectar el tipo de sistema de archivos: %v", err)
 	}
 
-	fmt.Printf("[MOVE] Sistema de archivos detectado: %s\n", fsType)
+	//fmt.Printf("[MOVE] Sistema de archivos detectado: %s\n", fsType)
 
 	if fsType == estructuraArchivoCarpeta.EXT2_FILESYSTEM_TYPE {
 		return moveInEXT2(file, partition, sourcePath, destPath, sessionInfo)
@@ -293,7 +293,7 @@ func moveDirectoryInEXT2(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem,
 }
 
 func moveFileInEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, sourceDirInode, destDirInode *EstructuraarchivocarpetaP2.Inodo, fileName string, fileInodeNum int32) error {
-	fmt.Printf("[MOVE-FILE-EXT3] Moviendo archivo '%s' mediante cambio de referencias\n", fileName)
+	//fmt.Printf("[MOVE-FILE-EXT3] Moviendo archivo '%s' mediante cambio de referencias\n", fileName)
 
 	// 1. Agregar entrada en el directorio destino
 	err := addEntryToDirectoryEXT3(file, ext3fs, destDirInode, fileName, fileInodeNum)
@@ -360,8 +360,8 @@ type DirectoryContent struct {
 	Permissions [3]byte
 	UID         int32
 	GID         int32
-	Content     []byte                       // Para archivos
-	Children    map[string]*DirectoryContent // Para directorios
+	Content     []byte              // Para archivos
+	Children    []*DirectoryContent // Para directorios
 }
 
 // saveDirectoryContent guarda recursivamente todo el contenido de un directorio
@@ -374,7 +374,7 @@ func saveDirectoryContent(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem
 		Permissions: dirInode.Iperm,
 		UID:         dirInode.Iuid,
 		GID:         dirInode.Igid,
-		Children:    make(map[string]*DirectoryContent),
+		Children:    make([]*DirectoryContent, 0),
 	}
 
 	// Recorrer los bloques del directorio
@@ -413,14 +413,14 @@ func saveDirectoryContent(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem
 						fileContent = []byte{} // Contenido vacío como fallback
 					}
 
-					dirContent.Children[entryName] = &DirectoryContent{
+					dirContent.Children = append(dirContent.Children, &DirectoryContent{
 						Name:        entryName,
 						IsDirectory: false,
 						Permissions: entryInode.Iperm,
 						UID:         entryInode.Iuid,
 						GID:         entryInode.Igid,
 						Content:     fileContent,
-					}
+					})
 
 					fmt.Printf("[SAVE-FILE] Archivo '%s' guardado (%d bytes)\n", entryName, len(fileContent))
 
@@ -432,7 +432,7 @@ func saveDirectoryContent(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem
 						continue
 					}
 
-					dirContent.Children[entryName] = subDirContent
+					dirContent.Children = append(dirContent.Children, subDirContent)
 					fmt.Printf("[SAVE-DIR] Directorio '%s' guardado recursivamente\n", entryName)
 				}
 			}
@@ -444,7 +444,7 @@ func saveDirectoryContent(file *os.File, ext2fs *EstructuraExt2P2.EXT2FileSystem
 }
 
 func saveDirectoryContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, dirInode *EstructuraarchivocarpetaP2.Inodo, dirName string) (*DirectoryContent, error) {
-	fmt.Printf("[SAVE-CONTENT-EXT3] Guardando contenido del directorio '%s'\n", dirName)
+	//fmt.Printf("[SAVE-CONTENT-EXT3] Guardando contenido del directorio '%s'\n", dirName)
 
 	dirContent := &DirectoryContent{
 		Name:        dirName,
@@ -452,7 +452,7 @@ func saveDirectoryContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSy
 		Permissions: dirInode.Iperm,
 		UID:         dirInode.Iuid,
 		GID:         dirInode.Igid,
-		Children:    make(map[string]*DirectoryContent),
+		Children:    make([]*DirectoryContent, 0),
 	}
 
 	// Recorrer los bloques del directorio
@@ -491,16 +491,16 @@ func saveDirectoryContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSy
 						fileContent = []byte{} // Contenido vacío como fallback
 					}
 
-					dirContent.Children[entryName] = &DirectoryContent{
+					dirContent.Children = append(dirContent.Children, &DirectoryContent{
 						Name:        entryName,
 						IsDirectory: false,
 						Permissions: entryInode.Iperm,
 						UID:         entryInode.Iuid,
 						GID:         entryInode.Igid,
 						Content:     fileContent,
-					}
+					})
 
-					fmt.Printf("[SAVE-FILE-EXT3] Archivo '%s' guardado (%d bytes)\n", entryName, len(fileContent))
+					//fmt.Printf("[SAVE-FILE-EXT3] Archivo '%s' guardado (%d bytes)\n", entryName, len(fileContent))
 
 				} else if entryInode.Itype == 0 { // Directorio
 					// Guardar recursivamente
@@ -510,14 +510,14 @@ func saveDirectoryContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSy
 						continue
 					}
 
-					dirContent.Children[entryName] = subDirContent
+					dirContent.Children = append(dirContent.Children, subDirContent)
 					fmt.Printf("[SAVE-DIR-EXT3] Directorio '%s' guardado recursivamente\n", entryName)
 				}
 			}
 		}
 	}
 
-	fmt.Printf("[SAVE-CONTENT-EXT3] Contenido del directorio '%s' guardado (%d elementos)\n", dirName, len(dirContent.Children))
+	//fmt.Printf("[SAVE-CONTENT-EXT3] Contenido del directorio '%s' guardado (%d elementos)\n", dirName, len(dirContent.Children))
 	return dirContent, nil
 }
 
@@ -560,7 +560,7 @@ func createDirectoryWithContent(file *os.File, ext2fs *EstructuraExt2P2.EXT2File
 }
 
 func createDirectoryWithContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, parentInode *EstructuraarchivocarpetaP2.Inodo, dirContent *DirectoryContent, sessionInfo *sessionP2.UserSession) (int32, error) {
-	fmt.Printf("[CREATE-CONTENT-EXT3] Recreando directorio '%s' con contenido\n", dirContent.Name)
+	//fmt.Printf("[CREATE-CONTENT-EXT3] Recreando directorio '%s' con contenido\n", dirContent.Name)
 
 	// Crear el directorio base
 	newDirInodeNum, err := createBasicDirectoryEXT3(file, ext3fs, parentInode, dirContent.Name, dirContent.UID, dirContent.GID, dirContent.Permissions)

@@ -30,12 +30,12 @@ func GetBytesContent(block *BloquesP2.BloqueArchivo, length int) []byte {
 	}
 
 	// Debug para verificar el contenido que estamos extrayendo
-	fmt.Printf("[Debug-GetBytes] Se extrajeron %d bytes del bloque\n", length)
+	//fmt.Printf("[Debug-GetBytes] Se extrajeron %d bytes del bloque\n", length)
 
 	// Mostrar parte del contenido extraído para verificar
-	contentStr := string(result)
-	fmt.Printf("[Debug-GetBytes] Contenido extraído (hasta 30 caracteres): '%s'\n",
-		strings.ReplaceAll(contentStr[:min(30, len(contentStr))], "\x00", "\\0"))
+	//contentStr := string(result)
+	//fmt.Printf("[Debug-GetBytes] Contenido extraído (hasta 30 caracteres): '%s'\n",
+	//	strings.ReplaceAll(contentStr[:min(30, len(contentStr))], "\x00", "\\0"))
 
 	return result
 }
@@ -58,23 +58,23 @@ func SetBytesContent(block *BloquesP2.BloqueArchivo, content []byte) {
 	}
 
 	// Debug extensivo para verificar que se ha copiado correctamente
-	fmt.Printf("[Debug-SetBytes] Se copiaron %d bytes al bloque\n", copyLen)
+	//fmt.Printf("[Debug-SetBytes] Se copiaron %d bytes al bloque\n", copyLen)
 
 	// Imprimir el contenido como bytes para debugging
-	fmt.Printf("[Debug-SetBytes] Primeros 10 bytes copiados: [")
+	//fmt.Printf("[Debug-SetBytes] Primeros 10 bytes copiados: [")
 	for i := 0; i < 10 && i < copyLen; i++ {
 		if i > 0 {
-			fmt.Printf(", ")
+			//fmt.Printf(", ")
 		}
-		fmt.Printf("%d", block.B_content[i])
+		//fmt.Printf("%d", block.B_content[i])
 	}
-	fmt.Printf("]\n")
+	//fmt.Printf("]\n")
 
 	if copyLen > 0 {
 		// Mostrar como texto para verificar contenido legible
-		contentStr := string(block.B_content[:copyLen])
-		fmt.Printf("[Debug-SetBytes] Contenido copiado (hasta 30 caracteres): '%s'\n",
-			strings.ReplaceAll(contentStr[:min(30, len(contentStr))], "\x00", "\\0"))
+		//contentStr := string(block.B_content[:copyLen])
+		//fmt.Printf("[Debug-SetBytes] Contenido copiado (hasta 30 caracteres): '%s'\n",
+		//	strings.ReplaceAll(contentStr[:min(30, len(contentStr))], "\x00", "\\0"))
 
 		// Verificar si parece contenido de directorio
 		if block.B_content[0] == '.' && (block.B_content[1] == 0 || block.B_content[1] == '.') {
@@ -89,26 +89,6 @@ func min(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// DebugBloqueArchivo imprime información de depuración sobre un bloque de archivo
-func DebugBloqueArchivo(block *BloquesP2.BloqueArchivo, title string) {
-	fmt.Printf("[Debug-Bloque] %s:\n", title)
-
-	// Mostrar los primeros bytes como valores numéricos
-	fmt.Printf("  - Bytes (20 primeros): [")
-	for i := 0; i < 20 && i < len(block.B_content); i++ {
-		if i > 0 {
-			fmt.Printf(", ")
-		}
-		fmt.Printf("%d", block.B_content[i])
-	}
-	fmt.Printf("]\n")
-
-	// Mostrar contenido como texto
-	content := string(block.B_content[:])
-	fmt.Printf("  - Como texto (hasta 20 caracteres): '%s'\n",
-		strings.ReplaceAll(content[:min(20, len(content))], "\x00", "\\0"))
 }
 
 // findDirectoryInEXT2ForCopy busca un directorio en el sistema de archivos EXT2 y devuelve su número de inodo

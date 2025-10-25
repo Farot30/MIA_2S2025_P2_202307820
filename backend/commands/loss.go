@@ -291,26 +291,3 @@ func clearBlockArea(file *os.File, blockStart int32, blocksCount int32, blockSiz
 
 	return nil
 }
-
-// clearJournalingArea limpia el área de journaling específica de EXT3
-func clearJournalingArea(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) error {
-	// Calcular el inicio y tamaño del área de journaling
-	journalingStart := ext3fs.StartOffset + 86              // Después del superbloque (86 bytes)
-	journalingSize := ext3fs.SuperBlock.S_inodes_count * 50 // 50 bytes por entrada de journal
-
-	// Crear un buffer lleno de ceros
-	zeroBuffer := make([]byte, journalingSize)
-
-	// Escribir el buffer de ceros en el área de journaling
-	_, err := file.Seek(int64(journalingStart), 0)
-	if err != nil {
-		return fmt.Errorf("error posicionándose en área de journaling: %s", err)
-	}
-
-	_, err = file.Write(zeroBuffer)
-	if err != nil {
-		return fmt.Errorf("error escribiendo ceros en área de journaling: %s", err)
-	}
-
-	return nil
-}

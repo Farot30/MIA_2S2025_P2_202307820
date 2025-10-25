@@ -33,7 +33,7 @@ SECCIÓN B
 
 ## 1. Introducción
 
-ExtreamFS es una aplicación web multiplataforma diseñada por un sistema integral de gestión diseñado para la simulación y administración de un sistema de archivos basado en EXT2.
+ExtreamFS es una aplicación web multiplataforma diseñada por un sistema integral de gestión diseñado para la simulación y administración de un sistema de archivos basado en EXT2 y EXT3.
 La solución integra un backend implementado en Go que gestiona la lógica del sistema de archivos (discos virtuales .mia, particiones, MBR/EBR, siperbloque, inodos, bitmaps y bloques) y un frontend interactivo (React) que permite a los usuarios ejecutar comandos, cargar scripts .smia, visualizar salidas y generar reportes con la herramienta Graphviz. El propósito de la herramienta es ofrecer un entorno seguro y reproducible para experimentar con estructuras de disco, particiones y operaciones de sistema de archivos sin necesidad de hardware físico real.
 
 ---
@@ -41,7 +41,7 @@ La solución integra un backend implementado en Go que gestiona la lógica del s
 ## 2. Objetivos del Proyecto
 
 ### Objetivo General
-Desarrollar y documentar una aplicación web que simule un sistema de archivos EXT2, permitiendo la creación y administración de discos virtuales, particiones, inodos, bloques, usuarios y permisos, mediante una interfaz gráfica y APIs REST, para facilitar el aprendizaje y la experimentación práctica con estructuras de almacenamiento.
+Desarrollar y documentar una aplicación web que simule un sistema de archivos EXT2 y EXT3, permitiendo la creación y administración de discos virtuales, particiones, inodos, bloques, usuarios y permisos, mediante una interfaz gráfica y APIs REST, para facilitar el aprendizaje y la experimentación práctica con estructuras de almacenamiento.
 
 ### Objetivos expecíficos
 
@@ -174,7 +174,7 @@ rmdisk -path="/home/users/discos/Disco.mia"
 
 #### **FDISK**
 * **Función:** Crea, elimina o modifica particiones.
-* **Parámetros:** -size, -unit, -path, -type, -fit, -name.
+* **Parámetros:** -size, -unit, -path, -type, -fit, -name., -add, -delete
 * **Ejemplo:**
 
 ~~~Go
@@ -201,11 +201,14 @@ mounted
 
 ### **8.3 Administración del Sistema de Archivos**
 * **MKFS:**
-* Formatea la partición EXT2.
+* Esto va a depender de que parametro agarre
+* **Paránetros:** -id, -type, -fs
+* Formatea la partición EXT2 o EXT3
 * **Ejemplo:**
 
 ~~~Go
-mkfs -id=201A
+mkfs -id=062A -fs=3fs
+mkfs -type=full -id=061A​
 ~~~
 
 ### **8.4 Administración de Uusarios y Grupos**
@@ -292,6 +295,23 @@ mkfile -path=/home/user/docs/b.txt -r -cont=/home/Documents/b.txt
 rep -id=A118 -path=/home/user/reports/reporte1.jpg -name=mbr
 rep -id=A118 -path=/home/user/reports/report9.txt -path_file_ls=/home/a.txt -name=file
 ~~~
+
+### 8.7. Nuevos Comandos Implementados
+
+| Comando | Función | Parámetros | Observaciones Técnicas |
+| :--- | :--- | :--- | :--- |
+| **UNMOUNT** | Desmonta una partición montada.| `-id` (Obligatorio) |Al desmontar, el valor del correlativo de la partición debe cambiar a **0**. |
+| **REMOVE** | Elimina un archivo o carpeta y todo su contenido.|`-path` (Obligatorio)| Requiere permiso de **escritura**.Si falla un permiso interno, no se elimina nada en el nivel superior. |
+| **EDIT** |Edita el contenido de un archivo. |`-path` (Obligatorio), `-contenido` (Obligatorio)  | Requiere permisos de **lectura y escritura**. `-contenido` es la ruta a un archivo del SO con el nuevo contenido. |
+| **RENAME** | Cambia el nombre de un archivo o carpeta.  | `-path` (Obligatorio), `-name` (Obligatorio)  | Requiere permiso de **escritura**. Debe validar que el nuevo nombre no exista. |
+| **COPY** | Realiza una copia de un archivo/carpeta y su contenido.  | `-path` (Obligatorio, Origen), `-destino` (Obligatorio, Carpeta destino)  | Requiere permiso de **lectura** en el origen  y **escritura** en el destino. |
+| **MOVE** | Mueve un archivo/carpeta y su contenido a un destino.  | `-path` (Obligatorio, Origen), `-destino` (Obligatorio, Carpeta destino) | Requiere permiso de **escritura** sobre el origen y el destino. Si es en la misma partición, solo se cambian las referencias. |
+| **FIND** | Realiza una búsqueda por nombre (soporta `?` y `*`). | `-path` (Obligatorio, Inicio de búsqueda), `-name` (Obligatorio, Patrón) | Soporta `?` (un carácter) y `*` (uno o más caracteres). |
+| **CHOWN** | Cambia el propietario de archivos/carpetas. | `-path` (Obligatorio), `-usuario` (Obligatorio), `-r` (Opcional, recursivo) | Solo **root** o el propietario actual pueden ejecutarlo. |
+| **CHMOD** | Cambia los permisos (ugo) de un archivo o carpeta. | `-path` (Obligatorio), `-ugo` (Obligatorio), `-r` (Opcional, recursivo) | Solo lo puede ejecutar **root**. `-ugo` son 3 números (0-7) para Usuario, Grupo y Otros. |
+
+---
+
 
 ---
 

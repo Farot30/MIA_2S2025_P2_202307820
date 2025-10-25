@@ -1,10 +1,8 @@
 package commandsP2
 
 import (
-	BloquesP2 "MIA_2S2025_P2_202307820/Bloques"
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
 	EstructuraExt3 "MIA_2S2025_P2_202307820/EstructuraExt3"
-	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	session "MIA_2S2025_P2_202307820/Session"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
@@ -134,9 +132,6 @@ func readFileFromEXT3(partition MountedPartition, filePath string, sessionInfo *
 	if err != nil {
 		return "", fmt.Errorf("error leyendo archivo '%s': %s", filePath, err)
 	}
-
-	// Registrar la operación en el journal
-	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, "-")
 
 	return content, nil
 }
@@ -417,9 +412,6 @@ func readFileFromEXT3WithSession(partition MountedPartition, filePath string, se
 		return "", fmt.Errorf("error leyendo archivo '%s': %s", filePath, err)
 	}
 
-	// Registrar la operación en el journal
-	LogEXT3Operation(EstructuraExt3.OPERATION_CAT, filePath, "-")
-
 	return content, nil
 }
 
@@ -534,66 +526,102 @@ func DetectFileSystemType(partition MountedPartition) (int32, error) {
 	return superBlock.S_filesystem_type, nil
 }
 
-// checkFileReadPermissionEXT3 verifica permisos de lectura en EXT3
 func checkFileReadPermissionEXT3(file *os.File, ext3fs *EstructuraExt3.EXT3FileSystem, filePath string, userUID, userGID int32) (bool, error) {
 	// Root (UID 1) puede leer cualquier archivo
 	if userUID == 1 {
 		return true, nil
 	}
 
-	// Implementar verificación de permisos específica para EXT3
-	// Por ahora, usar la misma lógica que EXT2
-	return true, nil // Placeholder - implementar lógica completa
+	// Buscar el inodo del archivo por su ruta
+	fileInodeNum, err := findFileByPathEXT3(file, ext3fs, filePath)
+	if err != nil {
+		return false, fmt.Errorf("archivo no encontrado: %s", err)
+	}
+
+	// Leer el inodo del archivo
+	fileInode := &estructuraArchivoCarpeta.Inodo{}
+	inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (fileInodeNum * ext3fs.SuperBlock.S_inode_s))
+	err = utilitiesP2.ReadStruct(file, inodeOffset, fileInode)
+	if err != nil {
+		return false, fmt.Errorf("error leyendo inodo del archivo: %s", err)
+	}
+
+	fileUID := fileInode.GetIuid()
+	fileGID := fileInode.GetIgid()
+	permissions := fileInode.GetIperm()
+
+	// 1. Si el usuario es el propietario del archivo
+	if userUID == fileUID {
+		ownerPermission := permissions[0]
+		hasReadPermission := (ownerPermission & 4) != 0
+		return hasReadPermission, nil
+	}
+
+	// 2. Si el usuario pertenece al mismo grupo que el archivo
+	if userGID == fileGID {
+		groupPermission := permissions[1]
+		hasReadPermission := (groupPermission & 4) != 0
+		return hasReadPermission, nil
+	}
+
+	// 3. Permisos para otros usuarios
+	otherPermission := permissions[2]
+	hasReadPermission := (otherPermission & 4) != 0
+	return hasReadPermission, nil
 }
 
-func readFileContentFromInodeEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem, inode *estructuraArchivoCarpeta.Inodo) ([]byte, error) {
-	if inode.Itype != 1 {
-		return nil, fmt.Errorf("el inodo no es un archivo")
+// Helper para buscar el inodo por ruta en EXT3
+func findFileByPathEXT3(file *os.File, ext3fs *EstructuraExt3.EXT3FileSystem, filePath string) (int32, error) {
+	if filePath == "/" {
+		return 0, nil // Inodo raíz
 	}
 
-	totalSize := inode.Is
-	if totalSize <= 0 {
-		return []byte{}, nil
-	}
+	pathComponents := strings.Split(strings.Trim(filePath, "/"), "/")
+	currentInodeNum := int32(0) // Empezar desde la raíz
 
-	var content []byte
-	bytesRead := int32(0)
-
-	// Leer bloques directos
-	for i := 0; i < 12 && inode.Iblock[i] != -1 && bytesRead < totalSize; i++ {
-		blockNum := inode.Iblock[i]
-		block := &BloquesP2.BloqueArchivo{}
-
-		err := utilitiesP2.ReadStruct(file, int64(ext3fs.SuperBlock.S_block_start+blockNum*ext3fs.SuperBlock.S_block_s), block)
-		if err != nil {
-			return nil, fmt.Errorf("error leyendo bloque %d: %v", blockNum, err)
+	for i, component := range pathComponents {
+		if component == "" {
+			continue
 		}
 
-		bytesToRead := min(64, int(totalSize-bytesRead))
-		blockContent := GetBytesContent(block, bytesToRead)
-		content = append(content, blockContent...)
-		bytesRead += int32(bytesToRead)
+		currentInode := &estructuraArchivoCarpeta.Inodo{}
+		inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (currentInodeNum * ext3fs.SuperBlock.S_inode_s))
+		err := utilitiesP2.ReadStruct(file, inodeOffset, currentInode)
+		if err != nil {
+			return -1, fmt.Errorf("error leyendo inodo: %s", err)
+		}
+
+		foundInodeNum, err := findFileInDirectoryEXT3(file, ext3fs, currentInode, component)
+		if err != nil {
+			return -1, fmt.Errorf("error buscando componente '%s': %s", component, err)
+		}
+
+		if foundInodeNum == -1 {
+			if i == len(pathComponents)-1 {
+				return -1, fmt.Errorf("archivo '%s' no encontrado", component)
+			} else {
+				currentPath := "/" + strings.Join(pathComponents[:i+1], "/")
+				return -1, fmt.Errorf("directorio '%s' no encontrado", currentPath)
+			}
+		}
+
+		// Si no es el último componente, verificar que es un directorio
+		if i < len(pathComponents)-1 {
+			foundInode := &estructuraArchivoCarpeta.Inodo{}
+			inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + (foundInodeNum * ext3fs.SuperBlock.S_inode_s))
+			err = utilitiesP2.ReadStruct(file, inodeOffset, foundInode)
+			if err != nil {
+				return -1, fmt.Errorf("error leyendo inodo: %s", err)
+			}
+
+			if !foundInode.IsDirectory() {
+				currentPath := "/" + strings.Join(pathComponents[:i+1], "/")
+				return -1, fmt.Errorf("'%s' no es un directorio", currentPath)
+			}
+		}
+
+		currentInodeNum = foundInodeNum
 	}
 
-	return content[:min(len(content), int(totalSize))], nil
-}
-
-func readFileContentFromInodeEXT2(file *os.File, ext2fs *EstructuraExt2.EXT2FileSystem, inode *estructuraArchivoCarpeta.Inodo) ([]byte, error) {
-	// Implementación similar a EXT3 pero usando estructuras EXT2
-	if inode.Itype != 1 {
-		return nil, fmt.Errorf("el inodo no es un archivo")
-	}
-
-	totalSize := inode.Is
-	if totalSize <= 0 {
-		return []byte{}, nil
-	}
-
-	// Usar la función existente readFileContentFromBlocks
-	content, err := readFileContentFromBlocks(file, ext2fs, inode)
-	if err != nil {
-		return nil, err
-	}
-
-	return []byte(content), nil
+	return currentInodeNum, nil
 }

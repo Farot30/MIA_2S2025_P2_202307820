@@ -1,20 +1,12 @@
 {
   "disks": [
     {
-      "name": "disco1",
-      "path": "/home/farot/Documentos/Archivos/proyectos/Proyecto2/MIA_2S2025_P2_202307820/backend/disco1.mia",
-      "size": 5242880,
+      "name": "Disco1",
+      "path": "/home/farot/Calificacion_MIA/Discos/Disco1.mia",
+      "size": 62914560,
       "fit": "F",
-      "created_at": "2025-10-16T23:38:25.65082818-06:00",
-      "last_accessed": "2025-10-16T23:57:35.59072945-06:00"
-    },
-    {
-      "name": "disco2",
-      "path": "/home/farot/Documentos/Archivos/proyectos/Proyecto2/MIA_2S2025_P2_202307820/backend/disco2.mia",
-      "size": 6291456,
-      "fit": "F",
-      "created_at": "2025-10-16T23:38:25.680955926-06:00",
-      "last_accessed": "2025-10-16T23:57:35.591011788-06:00"
+      "created_at": "2025-10-24T20:08:33.95453595-06:00",
+      "last_accessed": "2025-10-24T20:09:57.496081912-06:00"
     }
   ]
 }

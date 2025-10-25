@@ -260,9 +260,51 @@ Cuando montás una partición, la aplicación crea una tabla de montajes en RAM;
 
     - Sintaxis: rep -name=ls -id=201A -path=/home/user/reporte/report10.jpg -path_file_ls=/home
 
+### **6.7. Gestión de Archivos Avanzada y Permisos (Nuevos Comandos)**
+
+* **REMOVE** — Elimina un archivo o carpeta.
+    - Función: Borra un archivo o directorio de forma permanente (requiere permiso de **escritura** en el directorio padre).
+    - Sintaxis: `remove -path="/ruta/archivo_o_carpeta"`
+    - Ejemplo: `remove -PatH=/home/user/docs/a.txt`
+
+* **EDIT** — Edita el contenido de un archivo.
+    - Función: Reemplaza el contenido de un archivo existente con el contenido de un archivo ubicado en el Sistema Operativo (SO). Requiere permisos de **lectura y escritura**.
+    - Sintaxis: `edit -path="/ruta/archivo" -contenido="/ruta/origen_contenido_so"`
+    - Ejemplo: `edit -path=/home/user/docs/a.txt -contenido=/root/files/a.txt`
+
+* **RENAME** — Cambia el nombre de un archivo o carpeta.
+    - Función: Modifica el nombre de un archivo o carpeta. Requiere permiso de **escritura**.
+    - Sintaxis: `rename -path="/ruta/archivo_o_carpeta" -name=<nuevo_nombre>`
+    - Ejemplo: `rename -path=/home/user/docs/a.txt -name=b1.txt`
+
+* **COPY** — Copia un archivo o carpeta.
+    - Función: Duplica un archivo o carpeta (incluyendo su contenido). Requiere permiso de **lectura** en origen y **escritura** en destino.
+    - Sintaxis: `copy -path="/ruta/origen" -destino="/ruta/destino_carpeta"`
+    - Ejemplo: `copy -path="/home/user/documents" -destino="/home/images"`
+
+* **MOVE** — Mueve un archivo o carpeta.
+    - Función: Traslada un archivo o carpeta a una nueva ubicación. Requiere permiso de **escritura** en origen y destino.
+    - Sintaxis: `move -path="/ruta/origen" -destino="/ruta/destino_carpeta"`
+    - Ejemplo: `move -path="/home/user/documents" -destino="/home/images"`
+
+* **FIND** — Busca archivos o carpetas por nombre.
+    - Función: Realiza una búsqueda dentro del sistema de archivos, soportando los comodines **`?`** (un carácter) y **`*`** (uno o más caracteres).
+    - Sintaxis: `find -path="/ruta/inicio_busqueda" -name=<patron_busqueda>`
+    - Ejemplo: `find -path = "/" -name = "?.*"`
+
+* **CHOWN** — Cambia el propietario.
+    - Función: Asigna un nuevo usuario como propietario de un archivo o carpeta. Solo puede ser ejecutado por el usuario **`root`** o el propietario actual.
+    - Parámetro: `-r` (opcional) indica si la operación debe ser recursiva.
+    - Sintaxis: `chown -path="/ruta/archivo_o_carpeta" -usuario=<nuevo_propietario> -r`
+    - Ejemplo: `chown -path=/home -r -usuario=user2`
+
+* **CHMOD** — Cambia los permisos.
+    - Función: Modifica los permisos de un archivo o carpeta usando la **notación octal** (3 dígitos: Usuario, Grupo, Otros, donde 7 es Lectura, Escritura y Ejecución). Solo puede ser ejecutado por el usuario **`root`**.
+    - Parámetro: `-r` (opcional) indica si la operación debe ser recursiva.
+    - Sintaxis: `chmod -path="/ruta/archivo_o_carpeta" -ugo=<tres_digitos_0-7> -r`
+    - Ejemplo: `chmod -path=/home -ugo=755 -r`
+
 Notas: los reportes suelen generarse como archivos Graphviz; si Graphviz está instalado se exportan a PNG/SVG o también exceptuando de un reporte, se generara en tipo txt. También va a depender de extensión le vaya a poner a su reportes, me refiero si es tipo .jpg, .png, .pdf, etc y entre otros.
-
-
 
 
 ## **7. Ejemplos paso a paso**
@@ -285,6 +327,35 @@ Notas: los reportes suelen generarse como archivos Graphviz; si Graphviz está i
 8. rep -name=tree -id=201A -path="/home/user/reports/tree.png"
 
 9. logout
+
+### **7.2. Ejemplo de FDISK y UNMOUNT (Nuevas Funcionalidades)**
+
+1.  **Redimensionar Partición:** `fdisk -add=-5 -unit=M -path="/home/user/diskA.mia" -name=partA`
+
+2.  **Desmontar Partición:** `unmount -id=201A`
+
+3.  **Eliminar Partición:** `fdisk -name=partA -delete=fast -path=/home/user/diskA.mia`
+
+### **7.3. Ejemplo de Administración de Archivos y Permisos (Nuevas Funcionalidades)**
+
+1.  `login -user=root -pass=123 -id=201A` (Asumiendo que la partición fue reformateada y montada)
+
+2.  `mkfile -path=/docs/temp.txt -size=1 -id=201A -cont="Borrar"`
+
+3.  `remove -path=/docs/temp.txt`
+
+4.  `mkdir -path=/nuevos_docs -id=201A -p`
+
+5.  `rename -path=/docs -name=documentos`
+
+6.  `copy -path=/documentos/nota.txt -destino=/nuevos_docs`
+
+7.  `move -path=/nuevos_docs/nota.txt -destino=/documentos`
+
+8.  `chown -path=/documentos -usuario=user1 -r`
+
+9.  `chmod -path=/documentos -ugo=700 -r`
+
 
 ### **8. Manejo de errores comunes**
 
@@ -327,3 +398,15 @@ Notas: los reportes suelen generarse como archivos Graphviz; si Graphviz está i
 | **17** | **REP**     | Genera reportes a partir del estado del disco o sistema de archivos.           | `rep -name=<tipo> -id=<idMontaje> -path="/ruta/salida/archivo"`                                 | `rep -name=tree -id=vd1 -path="/home/user/reports/tree.png"`                                   |
 | **18** | **REP FILE**| Genera un reporte de archivo.                                                  | `rep -name=file -id=<idMontaje> -path="/ruta/salida/archivo" -path_file_ls="/ruta/archivo.txt"` | `rep -name=file -id=201A -path=/home/user/reporte/texto.txt -path_file_ls=/home/a.txt`         |
 | **19** | **REP LS**  | Genera un reporte de listado de directorio.                                    | `rep -name=ls -id=<idMontaje> -path="/ruta/salida/archivo" -path_file_ls="/ruta/directorio"`    | `rep -name=ls -id=201A -path=/home/user/reporte/report10.jpg -path_file_ls=/home`             |
+| **20** | **FDISK ADD** | Agrega o quita espacio a una partición. | `fdisk -add=<+/-Tamaño> -unit=<B/K/M> -path=\"/ruta/disco\" -name=<nombre>`| `fdisk -add=1 -unit=M -path=\"/home/Disco4.dk\" -name=Particion4` |
+| **21** | **FDISK DELETE** | Elimina una partición existente. | `fdisk -delete=<Fast/Full> -path=\"/ruta/disco\" -name=<nombre>`  | `fdisk -name=Particion1 -delete=full -path=/home/Disco1.dk` |
+| **22** | **UNMOUNT** | Desmonta una partición del sistema usando su ID de montaje. | `unmount -id=<idMontaje>` | `unmount -id=341A` |
+| **23** | **MKFS EXT3** | Formatea la partición como sistema de archivos EXT3. | `mkfs -id=<idMontaje> -fs=3fs -type=full`  | `mkfs -id=062A -fs=3fs` |
+| **24** | **REMOVE** | Elimina un archivo o carpeta (requiere permiso de escritura). | `remove -path=\"/ruta/archivo_o_carpeta\"` | `remove -PatH=/home/user/docs/a.txt` |
+| **25** | **EDIT** | Edita el contenido de un archivo (requiere L/E). | `edit -path=\"/ruta/archivo\" -contenido=\"/ruta/origen_contenido_so\"`  | `edit -path=/home/user/docs/a.txt -contenido=/root/files/a.txt` |
+| **26** | **RENAME** | Cambia el nombre de un archivo o carpeta (requiere E). | `rename -path=\"/ruta/archivo_o_carpeta\" -name=<nuevo_nombre>`  | `rename -path=/home/user/docs/a.txt -name=b1.txt` |
+| **27** | **COPY** | Copia un archivo o carpeta a otro destino (requiere L en origen, E en destino). | `copy -path=\"/ruta/origen\" -destino=\"/ruta/destino_carpeta\"`  | `copy -path=\"/home/user/documents\" -destino=\"/home/images\"`  |
+| **28** | **MOVE** | Mueve un archivo o carpeta a otro destino (requiere E en origen y destino). | `move -path=\"/ruta/origen\" -destino=\"/ruta/destino_carpeta\"` | `move -path=\"/home/user/documents\" -destino=\"/home/images\"` |
+| **29** | **FIND** | Busca archivos o carpetas por nombre (soporta `?` y `*`). | `find -path=\"/ruta/inicio_busqueda\" -name=<patron_busqueda>`  | `find -path = "/" -name = "?.*"`  |
+| **30** | **CHOWN** | Cambia el propietario de un archivo o carpeta (solo root o propietario). | `chown -path=\"/ruta/archivo_o_carpeta\" -usuario=<nuevo_propietario> -r`  | `chown -path=/home -r -usuario=user2` |
+| **31** | **CHMOD** | Cambia los permisos (ugo: usuario, grupo, otros) de un archivo o carpeta (solo root). | `chmod -path=\"/ruta/archivo_o_carpeta\" -ugo=<tres_digitos_0-7> -r`  | `chmod -path=/home -ugo=755 -r`  |
