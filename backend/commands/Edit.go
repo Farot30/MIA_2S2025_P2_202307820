@@ -5,6 +5,7 @@ import (
 	EstructuraExt2 "MIA_2S2025_P2_202307820/EstructuraExt2"
 	EstructuraExt3P2 "MIA_2S2025_P2_202307820/EstructuraExt3"
 	sessionP2 "MIA_2S2025_P2_202307820/Session"
+	EstructuraarchivocarpetaP2 "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	estructuraArchivoCarpeta "MIA_2S2025_P2_202307820/estructuraArchivoCarpeta"
 	utilitiesP2 "MIA_2S2025_P2_202307820/utilities"
 	"fmt"
@@ -822,29 +823,61 @@ func updateFileContentEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSyste
 	return utilitiesP2.WriteStruct(file, int64(ext3fs.SuperBlock.S_inode_start+fileInodeNum*ext3fs.SuperBlock.S_inode_s), fileInode)
 }
 
-// findFreeBlockEXT3 encuentra un bloque libre en EXT3 - VERSIÓN MEJORADA
+// findFreeBlockEXT3 encuentra un bloque libre en EXT3 - VERSIÓN ULTRA-CORREGIDA
 func findFreeBlockEXT3(file *os.File, ext3fs *EstructuraExt3P2.EXT3FileSystem) (int32, error) {
+	// 1. Leer el bitmap de bloques
 	bitmapSize := (ext3fs.SuperBlock.S_blocks_count + 7) / 8
 	bitmap := make([]byte, bitmapSize)
 
-	_, err := file.ReadAt(bitmap, int64(ext3fs.SuperBlock.S_bm_block_start))
+	_, err := file.Seek(int64(ext3fs.SuperBlock.S_bm_block_start), 0)
 	if err != nil {
-		return -1, fmt.Errorf("error leyendo bitmap de bloques: %s", err)
+		return -1, fmt.Errorf("error posicionando en bitmap: %v", err)
 	}
 
-	// Buscar un bloque libre en el bitmap
-	for i := int32(0); i < ext3fs.SuperBlock.S_blocks_count; i++ {
-		byteIndex := i / 8
-		bitIndex := i % 8
+	_, err = file.Read(bitmap)
+	if err != nil {
+		return -1, fmt.Errorf("error leyendo bitmap: %v", err)
+	}
 
-		// Si el bit está en 0, el bloque está libre
-		if (bitmap[byteIndex] & (1 << (7 - bitIndex))) == 0 {
-			//fmt.Printf("DEBUG findFreeBlock: Bloque libre encontrado: %d\n", i)
-			return i, nil
+	// 2. CRÍTICO: Crear un mapa de bloques en uso leyendo TODOS los inodos
+	blocksInUse := make(map[int32]bool)
+
+	for inodeNum := int32(0); inodeNum < ext3fs.SuperBlock.S_inodes_count; inodeNum++ {
+		inode := &EstructuraarchivocarpetaP2.Inodo{}
+		inodeOffset := int64(ext3fs.SuperBlock.S_inode_start + inodeNum*ext3fs.SuperBlock.S_inode_s)
+
+		err := utilitiesP2.ReadStruct(file, inodeOffset, inode)
+		if err != nil {
+			continue // Si hay error leyendo, continuar
+		}
+
+		// Marcar todos los bloques usados por este inodo
+		for i := 0; i < 16; i++ {
+			if inode.Iblock[i] != -1 {
+				blocksInUse[inode.Iblock[i]] = true
+			}
 		}
 	}
 
-	return -1, fmt.Errorf("no hay bloques libres disponibles (revisados %d bloques)", ext3fs.SuperBlock.S_blocks_count)
+	// 3. Buscar un bloque libre que NO esté en uso
+	for blockNum := int32(0); blockNum < ext3fs.SuperBlock.S_blocks_count; blockNum++ {
+		byteIndex := blockNum / 8
+		bitIndex := blockNum % 8
+
+		// Verificar en el bitmap
+		mask := byte(1 << (7 - bitIndex))
+		isUsedInBitmap := (bitmap[byteIndex] & mask) != 0
+
+		// Verificar en el mapa de bloques en uso
+		isUsedInInode := blocksInUse[blockNum]
+
+		// Solo retornar si está libre en AMBOS lugares
+		if !isUsedInBitmap && !isUsedInInode {
+			return blockNum, nil
+		}
+	}
+
+	return -1, fmt.Errorf("no hay bloques libres disponibles")
 }
 
 // markBlockAsUsedEXT2 marca un bloque como usado en el bitmap de EXT2
