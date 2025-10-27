@@ -31,7 +31,7 @@ const JournalingViewer = ({ session }) => {
 
   const fetchMountedPartitions = async () => {
     try {
-      const response = await fetch('http://localhost:8080/execute', {
+      const response = await fetch('http://18.222.221.137:8080/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commands: 'mounted' }),
@@ -88,7 +88,7 @@ const JournalingViewer = ({ session }) => {
     }
     
     try {
-      const response = await fetch(`http://localhost:8080/journaling?id=${partitionId}`);
+      const response = await fetch(`http://18.222.221.137:8080/journaling?id=${partitionId}`);
       
       if (!response.ok) {
         throw new Error(`Error del servidor: ${response.status}`);

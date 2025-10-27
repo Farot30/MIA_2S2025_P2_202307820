@@ -124,7 +124,7 @@ Requerimientos recomendados
 * **EBR (Extended Boot Record):**
     - Administra particiones lógicas dentro de una extendida
 
-### **7.2 Sistema EXT2 Interno**
+### **7.2 Sistema EXT2 y EXT3 Interno**
 * **Superbloque (superblock):**
     - Contiene metadatos del sistema (número de inodos, bloques, bitmaps, posiciones, magic number 0xEF53).
 * **Inodos:**
@@ -135,12 +135,16 @@ Requerimientos recomendados
     - Bloque Apuntador
 * **Bitmaps:**
     - Bitmap de inodos y bitmap de bloques (0=libre, 1=ocupado).
+* **Journal (EXT3):**
+    - Guardar las acciones que hace el usuario logueado.
 
-### Diagrama de EXT2
+### Diagrama de EXT2 y EXT3
 
 <p align="center">
  <img src="Diagrama_EXT2.png" widt>
 </p>
+
+
 
 ---
 
@@ -311,6 +315,32 @@ rep -id=A118 -path=/home/user/reports/report9.txt -path_file_ls=/home/a.txt -nam
 | **CHMOD** | Cambia los permisos (ugo) de un archivo o carpeta. | `-path` (Obligatorio), `-ugo` (Obligatorio), `-r` (Opcional, recursivo) | Solo lo puede ejecutar **root**. `-ugo` son 3 números (0-7) para Usuario, Grupo y Otros. |
 
 ---
+
+## **9. Subir a AWS proyecto
+Para subir a AWS, se tubo que trabajar con EC2, en la cual ahí se subira el backend del proyect, con lo que se tiene que empezar es crear las instancias, en las instancias se tiene que crear una llave de acceso para utilizar estas llaves de acceso para tenerlo en termius y tenerlo conectado a aws, con el EC2 creas tu propio instancia, con su propia ip, tener en cuenta que se tiene que crear en ubuntu, después tener en seguridad en grupos de seguridad crear otro grupo de seguridad para tener conexión en termius, después de eso, subir en termius y así tener subido el backend en termius y conectado a AWS.
+
+
+<p align="center">
+ <img src="Termius.png" widt>
+</p>
+
+Ahora con el S3 se subira el frontend, en la cual se tiene que crear un bucket, en la cual al momento de crear el bucket abra que hacer configuraciones publicas para que podamos tener conexión con el EC2 y el S3, en eso también en la parte de políticas después de crear el bucket se tiene que poner una configuración para poder tener subido nuestro programa en el bucket y tenerlo abierto, en la cual se hace las diferentes configuraciones que estan adelante
+
+<p align="center">
+ <img src="S3.png" widt>
+</p>
+
+
+configuraciones que se hace para subir al frontend al S3 bucket
+
+
+<p align="center">
+ <img src="Configuraciones.png" widt>
+</p>
+
+<p align="center">
+ <img src="configuraciones2.png" widt>
+</p>
 
 
 ---

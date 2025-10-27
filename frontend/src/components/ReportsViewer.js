@@ -20,7 +20,7 @@ const ReportsViewer = () => {
   const fetchReports = useCallback(async (silent = false) => {
       try {
         if (!silent) setLoading(true);
-        const response = await fetch('http://localhost:8080/reports/');
+        const response = await fetch('http://18.222.221.137:8080/reports/');
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);
         }
@@ -81,7 +81,7 @@ const ReportsViewer = () => {
 
   const fetchMountedPartitions = async () => {
     try {
-      const response = await fetch('http://localhost:8080/execute', {
+      const response = await fetch('http://18.222.221.137:8080/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commands: 'mounted' }),
@@ -166,8 +166,8 @@ const ReportsViewer = () => {
       }
       
       console.log('Ejecutando comando:', command); // Para debug
-      
-      const response = await fetch('http://localhost:8080/execute', {
+
+      const response = await fetch('http://18.222.221.137:8080/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commands: command }),
@@ -541,7 +541,7 @@ const ReportsViewer = () => {
                           ) : (
                             <>
                               <img
-                                src={`http://localhost:8080${report.url}`}
+                                src={`http://18.222.221.137:8080${report.url}`}
                                 alt={report.name}
                                 style={{
                                   width: '100%',
@@ -699,7 +699,7 @@ const ReportsViewer = () => {
               {selectedReport && (selectedReport.extension === '.txt' || 
                   ['bm_inode', 'bm_block', 'file'].includes(selectedReport.type)) ? (
                   <iframe
-                    src={`http://localhost:8080${selectedReport.url}`}
+                    src={`http://18.222.221.137:8080${selectedReport.url}`}
                     title={selectedReport.name}
                     style={{
                       width: '100%',
@@ -717,7 +717,7 @@ const ReportsViewer = () => {
                   />
               ) : (
                 <img
-                  src={`http://localhost:8080${selectedReport.url}`}
+                  src={`http://18.222.221.137:8080${selectedReport.url}`}
                   alt={selectedReport.name}
                   style={{
                     width: '100%',
@@ -746,7 +746,7 @@ const ReportsViewer = () => {
               }}
             >
               <a
-                href={`http://localhost:8080${selectedReport.url}`}
+                href={`http://18.222.221.137:8080${selectedReport.url}`}
                 download={selectedReport.name}
                 style={{
                   padding: '8px 16px',
@@ -763,7 +763,7 @@ const ReportsViewer = () => {
               </a>
               {selectedReport.extension !== '.txt' && (
                 <a
-                  href={`http://localhost:8080/reports/${selectedReport.name.replace(/\.[^.]+$/, '.dot')}`}
+                  href={`http://18.222.221.137:8080/reports/${selectedReport.name.replace(/\.[^.]+$/, '.dot')}`}
                   download={selectedReport.name.replace(/\.[^.]+$/, '.dot')}
                   style={{
                     padding: '8px 16px',

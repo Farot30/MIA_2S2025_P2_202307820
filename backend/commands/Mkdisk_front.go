@@ -77,7 +77,7 @@ func RegisterDisk(path string, size int32, fit byte) error {
 		return fmt.Errorf("error guardando registro: %v", err)
 	}
 
-	fmt.Printf("✅ Disco registrado exitosamente en el sistema\n")
+	fmt.Printf("Disco registrado exitosamente en el sistema\n")
 	return nil
 }
 

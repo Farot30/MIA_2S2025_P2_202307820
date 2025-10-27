@@ -460,7 +460,7 @@ func startServer() {
 	http.HandleFunc("/journaling", commandsP2.HandleJournalingAPI)
 
 	// Iniciar servidor
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
 }
 
 // listReportsHandler lista los reportes disponibles
