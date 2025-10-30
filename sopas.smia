@@ -38,12 +38,13 @@ fdisk -type=P -unit=b -name=Part5 -size=100 -path=/home/ubuntu/Calificacion_MIA/
 #100
 fdisk -type=P -unit=b -name=Part6 -size=100 -path=/home/ubuntu/Calificacion_MIA/Discos/Disco2.mia -fit=BF
 
+mount -path=/home/ubuntu/Calificacion_MIA/Discos/Disco2.mia -name=Part4
 
 #REPORTE
-#rep -id=201A -path=/home/ubuntu/Calificacion_MIA/Reportes/diskB.jpg -name=disk
+
+rep -id=201A -path=/home/ubuntu/Calificacion_MIA/Reportes/diskB.jpg -name=disk
 
 
-________________
 
 
 #------------ SISTEMAS DE ARCHIVOS COMPLETOS ---------------
@@ -89,17 +90,17 @@ mount -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia -name=Part1
 #202a -> 20 sus ultimos dos digitos
 mount -path=/home/ubuntu/Calificacion_MIA/Discos/Disco1.mia -name=Part2
 
-rep -id=201A -path=/home/ubuntu/Calificacion_MIA/Reportes/diskB.jpg -name=disk
+rep -id=201B -path=/home/ubuntu/Calificacion_MIA/Reportes/diskB.jpg -name=disk
 #******* DESMONTAR PARTICION *******
-unmount -id=202A 
+unmount -id=202B
 
 
 #******* CREACION DE SISTEMA DE ARCHIVOS *******
-mkfs -type=full -id=201A -fs=3fs
+mkfs -type=full -id=201B -fs=3fs
 
 
 #******* LOGIN *******
-login -user=root -pass=123 -id=201A
+login -user=root -pass=123 -id=201B
 
 
 #******* CREACION DE CARPETAS *******
@@ -145,7 +146,7 @@ remove -path=/calificacion/TEST/BORRAME
 
 
 #******* EDIT *******
-edit -path=/calificacion/TEST/nombre.txt -contenido=/home/ubuntu/Documentos/NAME.txt
+edit -path=/calificacion/TEST/nombre.txt -contenido=/home/ubuntu/Documentos/Name.txt
 
 
 #******* RENAME *******
@@ -179,19 +180,18 @@ logout
 
 
 #******* JOURNALING *******
-journaling -id=201A
+journaling -id=201B
 
 
 #******* LOSS *******
-loss -id=201A
+loss -id=201B
 
 
 #******* RECOVERY *******
-recovery -id=201A
+recovery -id=201B
 
 
 
 
 #******* LOGIN *******
-login -user=root -pass=123 -id=201A
-Explicar
+login -user=root -pass=123 -id=201B

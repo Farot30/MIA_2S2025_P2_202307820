@@ -25,7 +25,7 @@ function App() {
     try {
       // Ejecutar comando login en el backend
       const loginCommand = `login -user="${user}" -pass="${pass}" -id="${id}"`;
-      const resp = await fetch('http://18.222.221.137:8080/execute', {
+      const resp = await fetch('http://18.117.250.26:8080/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commands: loginCommand })
@@ -61,7 +61,7 @@ function App() {
   const handleLogout = async () => {
     try {
       // Ejecutar comando logout en el backend
-      const resp = await fetch('http://18.222.221.137:8080/execute', {
+      const resp = await fetch('http://18.117.250.26:8080/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commands: 'logout' })
@@ -93,7 +93,7 @@ function App() {
     setOutput('');
 
     try {
-      const resp = await fetch('http://18.222.221.137:8080/execute', {
+      const resp = await fetch('http://18.117.250.26:8080/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commands })
@@ -113,7 +113,7 @@ function App() {
         setOutput('(sin salida)');
       }
     } catch (err) {
-      setOutput(`Error de conexión: ${err.message}\nVerifica que el servidor esté ejecutándose en http://18.222.221.137:8080`);
+      setOutput(`Error de conexión: ${err.message}\nVerifica que el servidor esté ejecutándose en http://18.117.250.26:8080`);
     } finally {
       setIsLoading(false);
     }

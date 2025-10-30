@@ -25,7 +25,7 @@ const FileSystemExplorer = ({ session }) => {
       setLoading(true);
       setError('');
 
-      const resp = await fetch('http://18.222.221.137:8080/filesystem/disks');
+      const resp = await fetch('http://18.117.250.26:8080/filesystem/disks');
       if (!resp.ok) {
         throw new Error(`Error ${resp.status}: ${resp.statusText}`);
       }
@@ -79,7 +79,7 @@ const FileSystemExplorer = ({ session }) => {
         throw new Error('No hay partición seleccionada');
       }
 
-      const url = `http://18.222.221.137:8080/filesystem/content?partition_id=${pid}&path=${encodeURIComponent(path)}`;
+      const url = `http://18.117.250.26:8080/filesystem/content?partition_id=${pid}&path=${encodeURIComponent(path)}`;
       const resp = await fetch(url);
       
       if (!resp.ok) {
@@ -116,7 +116,7 @@ const FileSystemExplorer = ({ session }) => {
       setError('');
       
       // Usar el nuevo endpoint que utiliza CAT
-      const url = `http://18.222.221.137:8080/filesystem/file-content?partition_id=${selectedPartition.mounted_id}&file_path=${encodeURIComponent(file.path)}`;
+      const url = `http://18.117.250.26:8080/filesystem/file-content?partition_id=${selectedPartition.mounted_id}&file_path=${encodeURIComponent(file.path)}`;
       const resp = await fetch(url);
       
       if (!resp.ok) {
